@@ -1,27 +1,31 @@
-CC=gcc
-
 OBJDIR=objs
-SRCDIR=.
+SRCDIR=src
 INCDIR=$(SRCDIR)/inc
+CFLAGS+=-I$(INCDIR)
 
-CFLAGS+=-I$(INCDIR) -Wall -Werror -O3
-LDFLAGS+=-lxcb
+CC=gcc
 
 SRCS=$(wildcard $(SRCDIR)/*.c)
 OBJS=$(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
 
+CFLAGS+=-O2 -Wall -Werror
+LDFLAGS+=-lxcb -lcairo
+
 all: lighthouse
 
-lighthouse:
+run: lighthouse
+	./lighthouse
+
+lighthouse: $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 $(OBJS): | $(OBJDIR)
-
 $(OBJDIR):
 	mkdir -p $@
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.c $(INCDIR)/*.h Makefile
+$(OBJDIR)/%.o: $(SRCDIR)/%.c $(wildcard $(INCDIR)/*.h) Makefile
 	$(CC) $(CFLAGS) $< -c -o $@
 
 clean:
 	rm -rf $(OBJDIR) lighthouse
+
