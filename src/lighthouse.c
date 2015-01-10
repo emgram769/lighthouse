@@ -286,6 +286,12 @@ int main(int argc, char **argv) {
     goto cleanup;
   }
 
+  char *title = "lighthouse";
+  xcb_change_property(connection, XCB_PROP_MODE_REPLACE, window,
+    XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, strlen(title), title);
+  xcb_change_property(connection, XCB_PROP_MODE_REPLACE, window,
+    XCB_ATOM_WM_CLASS, XCB_ATOM_STRING, 8, strlen(title), title);
+
   /* Find the visualtype by iterating through depths. */
   xcb_visualtype_t *visual = NULL;
   xcb_depth_iterator_t depth_iter = xcb_screen_allowed_depths_iterator(screen);
