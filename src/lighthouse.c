@@ -68,6 +68,9 @@ typedef struct {
   unsigned int width;
   unsigned int screen_height;
   unsigned int screen_width;
+  /* Percentage offset ont the screen. */
+  unsigned int x;
+  unsigned int y;
 } settings_t;
 
 static char config_buf[MAX_CONFIG_SIZE];
@@ -75,6 +78,11 @@ static settings_t settings;
 
 /* Globals. */
 pthread_mutex_t draw_mutex;
+pthread_mutex_t result_mutex;
+char result_buf[100 * 1024];
+result_t *g_results;
+unsigned int g_result_count;
+unsigned int g_result_highlight;
 
 static inline int check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_t *connection, char *error) {
   xcb_generic_error_t *xcb_error = xcb_request_check(connection, cookie);
@@ -88,15 +96,17 @@ static inline int check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_t *c
 
 static void draw_line(cairo_t *cr, const char *text, unsigned int line, color_t *foreground, color_t *background) {
   pthread_mutex_lock(&draw_mutex);
+
   cairo_set_source_rgb(cr, background->r, background->g, background->b);
   cairo_rectangle(cr, 0, line * settings.height, settings.width, settings.height);
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
   cairo_move_to(cr, 5, (line + 1) * settings.height - settings.font_size/2);
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
-  cairo_select_font_face(cr, "Source Code Pro", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
   cairo_set_font_size(cr, settings.font_size);
   cairo_show_text(cr, text);
+
   pthread_mutex_unlock(&draw_mutex);
 }
 
@@ -106,16 +116,34 @@ static void draw_query_text(cairo_t *cr, const char *text) {
 
 static void draw_response_text(xcb_connection_t *connection, xcb_window_t window, cairo_t *cr, cairo_surface_t *surface, result_t *results, unsigned int result_count) {
 
-  unsigned int new_height = min(settings.height * (result_count + 1), settings.max_height);
-  uint32_t values[] = { /*200, 300,*/ settings.width, new_height};
+  if (window != 0) {
+    unsigned int new_height = min(settings.height * (result_count + 1), settings.max_height);
+    uint32_t values[] = { settings.width, new_height};
 
-  xcb_configure_window (connection, window, /*XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y |*/ XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
-  cairo_xcb_surface_set_size(surface, WIDTH, new_height);
+    xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
+    cairo_xcb_surface_set_size(surface, WIDTH, new_height);
+    xcb_flush(connection);
+    cairo_surface_flush(surface);
+  }
 
   int i;
-  for (i = 0; i < result_count; i++) {
-    draw_line(cr, results[i].text, i + 1, &settings.result_fg, &settings.result_bg);
+  if (g_result_count - 1 < g_result_highlight) {
+    g_result_highlight = g_result_count - 1;
   }
+  for (i = 0; i < result_count; i++) {
+    if (i != g_result_highlight) {
+      draw_line(cr, results[i].text, i + 1, &settings.result_fg, &settings.result_bg);
+    } else {
+      draw_line(cr, results[i].text, i + 1, &settings.highlight_fg, &settings.highlight_bg);
+    }
+  }
+  xcb_flush(connection);
+  cairo_surface_flush(surface);
+}
+
+static void redraw_all(xcb_connection_t *connection, xcb_window_t window, cairo_t *cr, cairo_surface_t *surface, char *query_string) {
+  draw_query_text(cr, query_string);
+  draw_response_text(connection, window, cr, surface, g_results, g_result_count);
 }
 
 unsigned int parse_response_text(char *text, size_t length, result_t **results) {
@@ -173,20 +201,23 @@ void *get_results(void *args) {
   xcb_connection_t *connection = ((struct result_params *)args)->connection;
   xcb_window_t window = ((struct result_params *)args)->window;
 
-  char buf[100 * 1024];
+  size_t res;
 
   while (1) {
-    size_t res = read(fd, buf, sizeof(buf));
+    res = read(fd, result_buf, sizeof(result_buf));
+    result_buf[res] = '\0';
     if (res <= 0) {
       fprintf(stderr, "Error in spawned cmd.\n");
       exit(1);
     }
-    printf("%s\n", buf);
     result_t *results;
-    unsigned int result_count = parse_response_text(buf, res, &results);
+    unsigned int result_count = parse_response_text(result_buf, res, &results);
+    if (g_results && results != g_results) {
+      free(g_results);
+    }
+    g_results = results;
+    g_result_count = result_count;
     draw_response_text(connection, window, cairo_context, cairo_surface, results, result_count);
-    free(results);
-    memset(buf, 0, sizeof(buf));
   }
 }
 
@@ -204,28 +235,56 @@ int write_to_remote(FILE *child, char *format, ...) {
   return 0;
 }
 
-static inline int process_key_stroke(char *query_buffer, unsigned int *query_index, xcb_keysym_t key, cairo_t *cairo_context, FILE *to_write) {
+static inline int process_key_stroke(char *query_buffer, unsigned int *query_index, xcb_keysym_t key, xcb_connection_t *connection, cairo_t *cairo_context, cairo_surface_t *cairo_surface, FILE *to_write) {
+  /* Check when we should update. */
+  int changed = 0;
 
-  printf("%d\n", key);
   switch (key) {
+    case 65293: /* Enter. */
+      if (g_results && g_result_highlight < g_result_count && g_result_highlight >= 0) {
+        printf("%s", g_results[g_result_highlight].action);
+        exit(0);
+      }
+      break;
+    case 65361: /* Left. */
+    case 65363: /* Right. */
+      break;
+    case 65362: /* Up. */
+      if (g_result_highlight > 0) {
+        g_result_highlight--;
+        draw_response_text(connection, 0, cairo_context, cairo_surface, g_results, g_result_count);
+      }
+      break;
+    case 65364: /* Down. */
+      if (g_result_highlight < g_result_count-1) {
+        g_result_highlight++;
+        draw_response_text(connection, 0, cairo_context, cairo_surface, g_results, g_result_count);
+      }
+      break;
     case 65307: /* Escape. */
       return 0;
       break; 
     case 65288: /* Backspace. */
       if (*query_index > 0) {
         query_buffer[--(*query_index)] = 0;
+        changed = 1;
       }
       break;
     default:
       if (isprint(key) && *query_index < MAX_QUERY) {
         query_buffer[(*query_index)++] = key;
+        changed = 1;
       }
       break;
   }
 
-  draw_query_text(cairo_context, query_buffer);
-  if (write_to_remote(to_write, "%s\n", query_buffer)) {
-    fprintf(stderr, "Failed to write.\n");
+  if (changed) {
+    draw_query_text(cairo_context, query_buffer);
+    if (write_to_remote(to_write, "%s\n", query_buffer)) {
+      fprintf(stderr, "Failed to write.\n");
+    }
+    xcb_flush(connection);
+    cairo_surface_flush(cairo_surface);
   }
 
   return 1;
@@ -278,14 +337,16 @@ int spawn_piped_process(char *file, int *to_child_fd, int *from_child_fd) {
 static void set_setting(char *param, char *val) {
   if (!strcmp("font_name", param)) {
     settings.font_name = val;
-    printf("font_name: %s\n", val);
   } else if (!strcmp("font_size", param)) {
     sscanf(val, "%u", &settings.font_size);
-    printf("font size: %d\n", settings.font_size);
   } else if (!strcmp("height", param)) {
     sscanf(val, "%u", &settings.height);
   } else if (!strcmp("width", param)) {
     sscanf(val, "%u", &settings.width);
+  } else if (!strcmp("x", param)) {
+    sscanf(val, "%u", &settings.x);
+  } else if (!strcmp("y", param)) {
+    sscanf(val, "%u", &settings.y);
   } else if (!strcmp("cmd", param)) {
     settings.cmd = val;
   } else if (!strcmp("query_fg", param)) {
@@ -315,6 +376,8 @@ static void initialize_settings(void) {
   settings.max_height = 800;
   settings.height = 30;
   settings.width = 500;
+  settings.x = 50;
+  settings.y = 50;
   /* Read in from the config file. */
   chdir(getenv("HOME"));
   size_t ret = 0;
@@ -389,7 +452,7 @@ int main(int argc, char **argv) {
             | XCB_EVENT_MASK_KEY_PRESS
             | XCB_EVENT_MASK_KEY_RELEASE;
   xcb_void_cookie_t window_cookie = xcb_create_window_checked(connection,
-    XCB_COPY_FROM_PARENT, window, screen->root, 0, 0, WIDTH, HEIGHT, 1,
+    XCB_COPY_FROM_PARENT, window, screen->root, 0, 0, WIDTH, HEIGHT, 0,
     XCB_WINDOW_CLASS_INPUT_OUTPUT, screen->root_visual,
     XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK, values);
 
@@ -404,8 +467,8 @@ int main(int argc, char **argv) {
     XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, strlen(title), title);
   xcb_change_property(connection, XCB_PROP_MODE_REPLACE, window,
     XCB_ATOM_WM_CLASS, XCB_ATOM_STRING, 8, strlen(title), title);
-  values[0] = screen->width_in_pixels / 2 - WIDTH / 2;
-  values[1] = screen->height_in_pixels / 2 - HEIGHT / 2;
+  values[0] = settings.x * screen->width_in_pixels / 100 - WIDTH / 2;
+  values[1] = settings.y * screen->height_in_pixels / 100 - HEIGHT / 2;
   settings.screen_width = screen->width_in_pixels;
   settings.screen_height = screen->height_in_pixels;
   xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
@@ -457,10 +520,6 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-
-/*  cairo_font_options_t *cairo_font_options = cairo_font_options_create();
-  cairo_font_options_set_antialias(cairo_font_options, CAIRO_ANTIALIAS_SUBPIXEL);
-*/
   xcb_map_window(connection, window);
   xcb_flush(connection);
 
@@ -472,22 +531,25 @@ int main(int argc, char **argv) {
   xcb_generic_event_t *event;
   while ((event = xcb_wait_for_event(connection))) {
     switch (event->response_type & ~0x80) {
-      case XCB_EXPOSE:
-        draw_query_text(cairo_context, query_string);
-        xcb_flush(connection);
+      case XCB_EXPOSE: {
         /* Get the input focus. */
         xcb_void_cookie_t focus_cookie = xcb_set_input_focus_checked(connection, XCB_INPUT_FOCUS_POINTER_ROOT, window, XCB_CURRENT_TIME);
         check_xcb_cookie(focus_cookie, connection, "Failed to grab focus.");
 
+        /* Redraw. */
+        redraw_all(connection, window, cairo_context, cairo_surface, query_string);
+        xcb_flush(connection);
+        cairo_surface_flush(cairo_surface);
+
         break;
+      }
       case XCB_KEY_PRESS: {
         break;
       }
       case XCB_KEY_RELEASE: {
         xcb_key_release_event_t *k = (xcb_key_release_event_t *)event;
         xcb_keysym_t key = xcb_key_press_lookup_keysym(keysyms, k, k->state);
-        int ret = process_key_stroke(query_string, &query_index, key, cairo_context, to_child);
-        xcb_flush(connection);
+        int ret = process_key_stroke(query_string, &query_index, key, connection, cairo_context, cairo_surface, to_child);
         if (ret <= 0) {
           exit_code = ret;
           goto cleanup;
@@ -501,7 +563,6 @@ int main(int argc, char **argv) {
     free(event);
   }
 
-//cleanup_cairo:
   cairo_surface_destroy(cairo_surface);
   cairo_destroy(cairo_context);
 

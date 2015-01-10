@@ -1,0 +1,11 @@
+#!/bin/bash
+function join { local IFS="$1"; shift; echo "$*"; }
+
+while read L; do
+  #echo "{$L|$i}";
+  array=()
+  while read -r -d $'\0'; do
+    array+=("{$REPLY|echo hi}")
+  done < <(find ~ -name ${L} -print0)
+  echo "${array[0]}" 
+done

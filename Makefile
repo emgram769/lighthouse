@@ -1,9 +1,8 @@
+CC=gcc
 OBJDIR=objs
 SRCDIR=src
 INCDIR=$(SRCDIR)/inc
 CFLAGS+=-I$(INCDIR)
-
-CC=gcc
 
 SRCS=$(wildcard $(SRCDIR)/*.c)
 OBJS=$(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
@@ -13,8 +12,8 @@ LDFLAGS+=-lxcb -lcairo -lpthread
 
 all: lighthouse
 
-run: lighthouse
-	./lighthouse
+config:
+	cp -ir config/* ~/.config/
 
 lighthouse: $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
