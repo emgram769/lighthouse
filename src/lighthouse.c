@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <wordexp.h>
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -77,12 +78,14 @@ static char config_buf[MAX_CONFIG_SIZE];
 static settings_t settings;
 
 /* Globals. */
-pthread_mutex_t draw_mutex;
-pthread_mutex_t result_mutex;
-char result_buf[100 * 1024];
-result_t *g_results;
-unsigned int g_result_count;
-unsigned int g_result_highlight;
+struct {
+  pthread_mutex_t draw_mutex;
+  pthread_mutex_t result_mutex;
+  char result_buf[1024 * 100];
+  result_t *results;
+  unsigned int result_count;
+  unsigned int result_highlight;
+} global;
 
 static inline int check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_t *connection, char *error) {
   xcb_generic_error_t *xcb_error = xcb_request_check(connection, cookie);
@@ -94,24 +97,70 @@ static inline int check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_t *c
   return 0;
 }
 
+static void draw_typed_line(cairo_t *cr, char *text, unsigned int line, unsigned int cursor, color_t *foreground, color_t *background) {
+  pthread_mutex_lock(&global.draw_mutex);
+
+  /* Set the background. */
+  cairo_set_source_rgb(cr, background->r, background->g, background->b);
+  cairo_rectangle(cr, 0, line * settings.height, settings.width, settings.height);
+  cairo_stroke_preserve(cr);
+  cairo_fill(cr);
+
+  /* Set the foreground color and font. */
+  cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
+  cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+
+  unsigned int x_offset = 5;
+  /* Find the cursor relative to the text. */
+  cairo_text_extents_t extents;
+  char saved_char = text[cursor];
+  text[cursor] = '\0';
+  cairo_text_extents(cr, text, &extents);
+  text[cursor] = saved_char;
+  unsigned int cursor_x = extents.x_advance;
+
+  /* Find the text offset. */
+  cairo_text_extents(cr, text, &extents);
+  if (settings.width < extents.width) {
+    x_offset = settings.width - extents.x_advance - x_offset;
+  }
+  cursor_x += x_offset;
+
+  /* Draw the text. */
+  cairo_move_to(cr, x_offset, (line + 1) * settings.height - settings.font_size/2);
+  cairo_set_font_size(cr, settings.font_size);
+  cairo_show_text(cr, text);
+
+  /* Draw the cursor. */
+  cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
+  cairo_rectangle(cr, cursor_x + 4, line * settings.height, 0, settings.height);
+  cairo_stroke_preserve(cr);
+  cairo_fill(cr);
+
+  pthread_mutex_unlock(&global.draw_mutex);
+}
+
 static void draw_line(cairo_t *cr, const char *text, unsigned int line, color_t *foreground, color_t *background) {
-  pthread_mutex_lock(&draw_mutex);
+  pthread_mutex_lock(&global.draw_mutex);
 
   cairo_set_source_rgb(cr, background->r, background->g, background->b);
   cairo_rectangle(cr, 0, line * settings.height, settings.width, settings.height);
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
-  cairo_move_to(cr, 5, (line + 1) * settings.height - settings.font_size/2);
+  cairo_text_extents_t extents;
+  cairo_text_extents(cr, text, &extents);
+  unsigned int x_offset = 5;
+  cairo_move_to(cr, x_offset, (line + 1) * settings.height - settings.font_size/2);
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
   cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
   cairo_set_font_size(cr, settings.font_size);
   cairo_show_text(cr, text);
 
-  pthread_mutex_unlock(&draw_mutex);
+  pthread_mutex_unlock(&global.draw_mutex);
 }
 
-static void draw_query_text(cairo_t *cr, const char *text) {
-  draw_line(cr, text, 0, &settings.query_fg, &settings.query_bg);
+static void draw_query_text(cairo_t *cr, const char *text, unsigned int cursor) {
+  draw_typed_line(cr, (char *)text, 0, cursor, &settings.query_fg, &settings.query_bg);
 }
 
 static void draw_response_text(xcb_connection_t *connection, xcb_window_t window, cairo_t *cr, cairo_surface_t *surface, result_t *results, unsigned int result_count) {
@@ -127,11 +176,11 @@ static void draw_response_text(xcb_connection_t *connection, xcb_window_t window
   }
 
   int i;
-  if (g_result_count - 1 < g_result_highlight) {
-    g_result_highlight = g_result_count - 1;
+  if (global.result_count - 1 < global.result_highlight) {
+    global.result_highlight = global.result_count - 1;
   }
   for (i = 0; i < result_count; i++) {
-    if (i != g_result_highlight) {
+    if (i != global.result_highlight) {
       draw_line(cr, results[i].text, i + 1, &settings.result_fg, &settings.result_bg);
     } else {
       draw_line(cr, results[i].text, i + 1, &settings.highlight_fg, &settings.highlight_bg);
@@ -141,9 +190,9 @@ static void draw_response_text(xcb_connection_t *connection, xcb_window_t window
   cairo_surface_flush(surface);
 }
 
-static void redraw_all(xcb_connection_t *connection, xcb_window_t window, cairo_t *cr, cairo_surface_t *surface, char *query_string) {
-  draw_query_text(cr, query_string);
-  draw_response_text(connection, window, cr, surface, g_results, g_result_count);
+static void redraw_all(xcb_connection_t *connection, xcb_window_t window, cairo_t *cr, cairo_surface_t *surface, char *query_string, unsigned int query_cursor_index) {
+  draw_query_text(cr, query_string, query_cursor_index);
+  draw_response_text(connection, window, cr, surface, global.results, global.result_count);
 }
 
 unsigned int parse_response_text(char *text, size_t length, result_t **results) {
@@ -204,19 +253,19 @@ void *get_results(void *args) {
   size_t res;
 
   while (1) {
-    res = read(fd, result_buf, sizeof(result_buf));
-    result_buf[res] = '\0';
+    res = read(fd, global.result_buf, sizeof(global.result_buf));
+    global.result_buf[res] = '\0';
     if (res <= 0) {
       fprintf(stderr, "Error in spawned cmd.\n");
       exit(1);
     }
     result_t *results;
-    unsigned int result_count = parse_response_text(result_buf, res, &results);
-    if (g_results && results != g_results) {
-      free(g_results);
+    unsigned int result_count = parse_response_text(global.result_buf, res, &results);
+    if (global.results && results != global.results) {
+      free(global.results);
     }
-    g_results = results;
-    g_result_count = result_count;
+    global.results = results;
+    global.result_count = result_count;
     draw_response_text(connection, window, cairo_context, cairo_surface, results, result_count);
   }
 }
@@ -235,51 +284,66 @@ int write_to_remote(FILE *child, char *format, ...) {
   return 0;
 }
 
-static inline int process_key_stroke(char *query_buffer, unsigned int *query_index, xcb_keysym_t key, xcb_connection_t *connection, cairo_t *cairo_context, cairo_surface_t *cairo_surface, FILE *to_write) {
+static inline int process_key_stroke(char *query_buffer, unsigned int *query_index, unsigned int *query_cursor_index, xcb_keysym_t key, xcb_connection_t *connection, cairo_t *cairo_context, cairo_surface_t *cairo_surface, FILE *to_write) {
   /* Check when we should update. */
   int changed = 0;
 
   switch (key) {
     case 65293: /* Enter. */
-      if (g_results && g_result_highlight < g_result_count && g_result_highlight >= 0) {
-        printf("%s", g_results[g_result_highlight].action);
+      if (global.results && global.result_highlight < global.result_count && global.result_highlight >= 0) {
+        printf("%s", global.results[global.result_highlight].action);
         exit(0);
       }
       break;
     case 65361: /* Left. */
+      if (*query_cursor_index > 0) {
+        (*query_cursor_index)--;
+        changed = 1;
+      }
+      break;
     case 65363: /* Right. */
+      if (*query_cursor_index < *query_index) {
+        (*query_cursor_index)++;
+        changed = 1;
+      }
       break;
     case 65362: /* Up. */
-      if (g_result_highlight > 0) {
-        g_result_highlight--;
-        draw_response_text(connection, 0, cairo_context, cairo_surface, g_results, g_result_count);
+      if (global.result_highlight > 0) {
+        global.result_highlight--;
+        draw_response_text(connection, 0, cairo_context, cairo_surface, global.results, global.result_count);
       }
       break;
     case 65364: /* Down. */
-      if (g_result_highlight < g_result_count-1) {
-        g_result_highlight++;
-        draw_response_text(connection, 0, cairo_context, cairo_surface, g_results, g_result_count);
+      if (global.result_highlight < global.result_count-1) {
+        global.result_highlight++;
+        draw_response_text(connection, 0, cairo_context, cairo_surface, global.results, global.result_count);
       }
       break;
     case 65307: /* Escape. */
       return 0;
-      break; 
     case 65288: /* Backspace. */
-      if (*query_index > 0) {
-        query_buffer[--(*query_index)] = 0;
+      if (*query_index > 0 && *query_cursor_index > 0) {
+        memmove(&query_buffer[(*query_cursor_index) - 1], &query_buffer[*query_cursor_index], *query_index - *query_cursor_index + 1);
+        (*query_cursor_index)--;
+        (*query_index)--;
+        query_buffer[(*query_index)] = 0;
         changed = 1;
+      } else if (*query_index == 0) { /* Backspace with nothing? */
+        return 0;
       }
       break;
     default:
       if (isprint(key) && *query_index < MAX_QUERY) {
-        query_buffer[(*query_index)++] = key;
+        memmove(&query_buffer[(*query_cursor_index) + 1], &query_buffer[*query_cursor_index], *query_index - *query_cursor_index + 1);
+        query_buffer[(*query_cursor_index)++] = key;
+        (*query_index)++;
         changed = 1;
       }
       break;
   }
 
   if (changed) {
-    draw_query_text(cairo_context, query_buffer);
+    draw_query_text(cairo_context, query_buffer, *query_cursor_index);
     if (write_to_remote(to_write, "%s\n", query_buffer)) {
       fprintf(stderr, "Failed to write.\n");
     }
@@ -317,7 +381,10 @@ int spawn_piped_process(char *file, int *to_child_fd, int *from_child_fd) {
     dup2(in_pipe[0], STDIN_FILENO);
     dup2(out_pipe[1], STDOUT_FILENO);
 
-    execlp(file, file, NULL);
+    wordexp_t expanded_file;
+    wordexp(file, &expanded_file, 0);
+
+    execlp((expanded_file.we_wordv)[0], (expanded_file.we_wordv)[0], NULL);
     fprintf(stderr, "Couldn't execute file.\n");
     close(out_pipe[1]);
     close(in_pipe[0]);
@@ -502,7 +569,7 @@ int main(int argc, char **argv) {
   }
 
   /* Spawn a thread to listen to our remote process. */
-  if (pthread_mutex_init(&draw_mutex, NULL)) {
+  if (pthread_mutex_init(&global.draw_mutex, NULL)) {
     fprintf(stderr, "Failed to create mutex.");
     goto cleanup;
   }
@@ -527,6 +594,7 @@ int main(int argc, char **argv) {
   char query_string[MAX_QUERY];
   memset(query_string, 0, sizeof(query_string));
   unsigned int query_index = 0;
+  unsigned int query_cursor_index = 0;
 
   xcb_generic_event_t *event;
   while ((event = xcb_wait_for_event(connection))) {
@@ -537,7 +605,7 @@ int main(int argc, char **argv) {
         check_xcb_cookie(focus_cookie, connection, "Failed to grab focus.");
 
         /* Redraw. */
-        redraw_all(connection, window, cairo_context, cairo_surface, query_string);
+        redraw_all(connection, window, cairo_context, cairo_surface, query_string, query_cursor_index);
         xcb_flush(connection);
         cairo_surface_flush(cairo_surface);
 
@@ -549,7 +617,7 @@ int main(int argc, char **argv) {
       case XCB_KEY_RELEASE: {
         xcb_key_release_event_t *k = (xcb_key_release_event_t *)event;
         xcb_keysym_t key = xcb_key_press_lookup_keysym(keysyms, k, k->state);
-        int ret = process_key_stroke(query_string, &query_index, key, connection, cairo_context, cairo_surface, to_child);
+        int ret = process_key_stroke(query_string, &query_index, &query_cursor_index, key, connection, cairo_context, cairo_surface, to_child);
         if (ret <= 0) {
           exit_code = ret;
           goto cleanup;

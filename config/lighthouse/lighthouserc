@@ -1,6 +1,6 @@
 font_name=monospace
 font_size=18
-cmd=/home/bwasti/.config/lighthouse/cmd
+cmd=~/.config/lighthouse/cmd
 query_fg=0.9,0.9,0.9
 query_bg=0.1,0.1,0.1
 result_bg=0.2,0.2,0.2
