@@ -451,8 +451,13 @@ static void initialize_settings(void) {
   settings.width = 500;
   settings.x = 50;
   settings.y = 50;
+
   /* Read in from the config file. */
-  chdir(getenv("HOME"));
+  if (chdir(getenv("HOME"))) {
+    fprintf(stderr, "Unable to access the HOME directory.\n");
+    exit(1);
+  }
+
   size_t ret = 0;
   if (access(CONFIG_FILE, F_OK) != -1) {
     int fd = open(CONFIG_FILE, O_RDONLY);
