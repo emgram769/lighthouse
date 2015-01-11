@@ -159,8 +159,9 @@ static void draw_line(cairo_t *cr, const char *text, unsigned int line, color_t 
   pthread_mutex_unlock(&global.draw_mutex);
 }
 
-static void draw_query_text(cairo_t *cr, const char *text, unsigned int cursor) {
+static void draw_query_text(cairo_t *cr, cairo_surface_t *surface, const char *text, unsigned int cursor) {
   draw_typed_line(cr, (char *)text, 0, cursor, &settings.query_fg, &settings.query_bg);
+  cairo_surface_flush(surface);
 }
 
 static void draw_response_text(xcb_connection_t *connection, xcb_window_t window, cairo_t *cr, cairo_surface_t *surface, result_t *results, unsigned int result_count) {
@@ -171,8 +172,6 @@ static void draw_response_text(xcb_connection_t *connection, xcb_window_t window
 
     xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
     cairo_xcb_surface_set_size(surface, settings.width, new_height);
-    xcb_flush(connection);
-    cairo_surface_flush(surface);
   }
 
   int i;
@@ -186,12 +185,12 @@ static void draw_response_text(xcb_connection_t *connection, xcb_window_t window
       draw_line(cr, results[i].text, i + 1, &settings.highlight_fg, &settings.highlight_bg);
     }
   }
-  xcb_flush(connection);
   cairo_surface_flush(surface);
+  xcb_flush(connection);
 }
 
 static void redraw_all(xcb_connection_t *connection, xcb_window_t window, cairo_t *cr, cairo_surface_t *surface, char *query_string, unsigned int query_cursor_index) {
-  draw_query_text(cr, query_string, query_cursor_index);
+  draw_query_text(cr, surface, query_string, query_cursor_index);
   draw_response_text(connection, window, cr, surface, global.results, global.result_count);
 }
 
@@ -204,7 +203,7 @@ unsigned int parse_response_text(char *text, size_t length, result_t **results) 
     /* Opening brace. */
     if (text[index] == '{') {
       if (mode != 0) {
-        fprintf(stderr, "Syntax error.");
+        fprintf(stderr, "Syntax error, found { at index %d.\n %s\n", index, text);
         free(ret);
         return 0;
       }
@@ -218,7 +217,7 @@ unsigned int parse_response_text(char *text, size_t length, result_t **results) 
     /* Split brace. */
     else if (text[index] == '|') {
       if (mode != 1) {
-        fprintf(stderr, "Syntax error.");
+        fprintf(stderr, "Syntax error, found | at index %d.\n %s\n", index, text);
         free(ret);
         return 0;
       }
@@ -231,7 +230,7 @@ unsigned int parse_response_text(char *text, size_t length, result_t **results) 
     /* Closing brace. */
     else if (text[index] == '}') {
       if (mode == 0) {
-        fprintf(stderr, "Syntax error.\n");
+        fprintf(stderr, "Syntax error, found } at index %d.\n %s\n", index, text);
         free(ret);
         return 0;
       }
@@ -346,9 +345,8 @@ static inline int process_key_stroke(char *query_buffer, unsigned int *query_ind
   }
 
   if (redraw) {
-    draw_query_text(cairo_context, query_buffer, *query_cursor_index);
+    draw_query_text(cairo_context, cairo_surface, query_buffer, *query_cursor_index);
     xcb_flush(connection);
-    cairo_surface_flush(cairo_surface);
   }
 
   if (resend) {
@@ -540,6 +538,27 @@ int main(int argc, char **argv) {
     goto cleanup;
   }
 
+  /* Get the atoms to create a dock window type. */
+  xcb_atom_t window_type_atom, window_type_dock_atom;
+  xcb_intern_atom_cookie_t atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_WINDOW_TYPE"), "_NET_WM_WINDOW_TYPE");
+  xcb_intern_atom_reply_t *atom_reply = xcb_intern_atom_reply(connection, atom_cookie, NULL); 
+  if (!atom_reply) {
+    fprintf(stderr, "Unable to set window type. You will need to manually set your window manager to run lighthouse as you'd like.");
+  } else {
+    window_type_atom = atom_reply->atom;
+    free(atom_reply);
+
+    atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_WINDOW_TYPE_DOCK"), "_NET_WM_WINDOW_TYPE_DOCK");
+    atom_reply = xcb_intern_atom_reply(connection, atom_cookie, NULL);
+    if (atom_reply) {
+      window_type_dock_atom = atom_reply->atom;
+      free(atom_reply);
+      xcb_change_property_checked(connection, XCB_PROP_MODE_REPLACE, window, window_type_atom, XCB_ATOM_ATOM, 32, 1, &window_type_dock_atom);
+    } else {
+      fprintf(stderr, "Unable to set window type. You will need to manually set your window manager to run lighthouse as you'd like.");
+    }
+  }
+
   /* Set window properties. */
   char *title = "lighthouse";
   xcb_change_property(connection, XCB_PROP_MODE_REPLACE, window,
@@ -600,13 +619,15 @@ int main(int argc, char **argv) {
   }
 
   xcb_map_window(connection, window);
-  xcb_flush(connection);
 
   /* Query string. */
   char query_string[MAX_QUERY];
   memset(query_string, 0, sizeof(query_string));
   unsigned int query_index = 0;
   unsigned int query_cursor_index = 0;
+
+  /* Now draw everything. */
+  redraw_all(connection, window, cairo_context, cairo_surface, query_string, query_cursor_index);
 
   xcb_generic_event_t *event;
   while ((event = xcb_wait_for_event(connection))) {
@@ -618,8 +639,6 @@ int main(int argc, char **argv) {
 
         /* Redraw. */
         redraw_all(connection, window, cairo_context, cairo_surface, query_string, query_cursor_index);
-        xcb_flush(connection);
-        cairo_surface_flush(cairo_surface);
 
         break;
       }
