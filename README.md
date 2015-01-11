@@ -16,21 +16,27 @@ Create config files. (This is important!)
     make config
 
 # How to use
+Typically you'll want to map a hotkey to run
+
+    lighthouse | sh
+
 Lighthouse is a simple dialog that pipes whatever input you type into
 the standard input of the executable specified by `cmd=[file]` in your
 `lighthouserc`. The standard output of that executable is then used to
-generate the results.
+generate the results.  A selected result (move with arrow keys to highlight
+and then hit enter to select) will then have its `action`
+printed to standard out (and in the case above, into the shell).
 
 Syntax
 ---
 The syntax of a result is simple.
-`{ title | output }`
-The `title` is displayed in the results and the `output` is written to standard out
+`{ title | action }`
+The `title` is displayed in the results and the `action` is written to standard out
 when that result is selected.  A common use case would therefore be
-`lighthouse | sh` and `output` would be some shell command.  Run `make config` and then
+`lighthouse | sh` and `action` would be some shell command.  Run `make config` and then
 `lighthouse | sh` to see this in action.  The `title` will be `look! [input]` and the
-`output` will be `[input]`, so you've effectively created a small one time shell prompt.
-To create multiple results simply chain them together: `{ title1 | output1 }{ title2 | output2 }`
+`action` will be `[input]`, so you've effectively created a small one time shell prompt.
+To create multiple results simply chain them together: `{ title1 | action1 }{ title2 | action2 }`
 
 Other ways to use lighthouse
 ---
