@@ -15,6 +15,10 @@ Copy it to some location in your $PATH.
 Create config files. (This is important!)
 
     make config
+    
+You may also need to make the `cmd` script executable.  (If you replace this script, be sure to make that exectuable as well.)
+
+    chmod +x ~/.config/lighthouse/cmd
 
 # How to use
 Typically you'll want to map a hotkey to run
