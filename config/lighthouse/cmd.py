@@ -3,12 +3,13 @@
 import sys
 import random
 from time import sleep
+import logging
 from google import pygoogle
 from multiprocessing import Process, Value, Manager, Array
 from ctypes import c_char
 import subprocess
 
-MAX_OUTPUT = 1024
+MAX_OUTPUT = 100 * 1024
 
 resultStr = Array(c_char, MAX_OUTPUT);
 
@@ -26,7 +27,7 @@ def append_output(title, action):
     if (len(arr) <= 2):
       insert = -1
     arr.insert(insert, title+"|"+action+"}")
-    resultStr.value = "{".join(arr)# + "{"+title+"|"+action+"}"
+    resultStr.value = "{".join(arr)
 
 def prepend_output(title, action):
   title = title.replace("{", "<").replace("}", ">").replace("|", ":")
@@ -40,7 +41,7 @@ def update_output():
 google_thr = None
 def google(query):
   sleep(.5) # so we aren't querying EVERYTHING we type
-  g = pygoogle(userInput)
+  g = pygoogle(userInput, log_level=logging.CRITICAL)
   g.pages = 1
   out = g.get_urls()
   if (len(out) >= 1):  
@@ -57,7 +58,9 @@ def find(query):
   update_output()
 
 special = {
-  "chrom": (lambda x: ("did you mean firefox?","firefox"))
+  "chrom": (lambda x: ("did you mean firefox?","firefox")),
+  "fire": (lambda x: ("firefox","firefox")),
+  "vi": (lambda x: ("vim","urxvt -e vim"))
 };
 
 while 1:
