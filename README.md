@@ -15,6 +15,10 @@ Copy it to some location in your $PATH.
 Create config files. (This is important!)
 
     make config
+    
+You may also need to make the `cmd` script executable.  (If you replace this script, be sure to make that exectuable as well.)
+
+    chmod +x ~/.config/lighthouse/cmd
 
 # How to use
 Typically you'll want to map a hotkey to run
@@ -44,6 +48,12 @@ Other ways to use lighthouse
 Because everything is handled through standard in and out, you can use pretty much any
 executable.  If you want to use a python file `~/.config/lighthouse/cmd.py`, simply point to it in `~/.config/lighthouse/lighthouserc`
 by making the line `cmd=~/.config/lighthouse/cmd.py`.  (Be sure to include `#!/usr/bin/python` at the top of your script!)  If you'd like some inspiration, check out the script in `config/lighthouse/cmd.py`.
+
+Debugging your script
+---
+Run `lighthouse` in your terminal and look at the output.  If the script crahes you'll see its
+standard error, and if it succeeds you'll see what lighthouse is outputting.  Check out
+`config/lighthouse/cmd.py` for an example of how more complicated scripts should work.
 
 Options
 ---
