@@ -170,7 +170,7 @@ static void draw_response_text(xcb_connection_t *connection, xcb_window_t window
     uint32_t values[] = { settings.width, new_height};
 
     xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
-    cairo_xcb_surface_set_size(surface, WIDTH, new_height);
+    cairo_xcb_surface_set_size(surface, settings.width, new_height);
     xcb_flush(connection);
     cairo_surface_flush(surface);
   }
@@ -519,7 +519,7 @@ int main(int argc, char **argv) {
             | XCB_EVENT_MASK_KEY_PRESS
             | XCB_EVENT_MASK_KEY_RELEASE;
   xcb_void_cookie_t window_cookie = xcb_create_window_checked(connection,
-    XCB_COPY_FROM_PARENT, window, screen->root, 0, 0, WIDTH, HEIGHT, 0,
+    XCB_COPY_FROM_PARENT, window, screen->root, 0, 0, settings.width, settings.height, 0,
     XCB_WINDOW_CLASS_INPUT_OUTPUT, screen->root_visual,
     XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK, values);
 
@@ -534,8 +534,8 @@ int main(int argc, char **argv) {
     XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, strlen(title), title);
   xcb_change_property(connection, XCB_PROP_MODE_REPLACE, window,
     XCB_ATOM_WM_CLASS, XCB_ATOM_STRING, 8, strlen(title), title);
-  values[0] = settings.x * screen->width_in_pixels / 100 - WIDTH / 2;
-  values[1] = settings.y * screen->height_in_pixels / 100 - HEIGHT / 2;
+  values[0] = settings.x * screen->width_in_pixels / 100 - settings.width / 2;
+  values[1] = settings.y * screen->height_in_pixels / 100 - settings.height / 2;
   settings.screen_width = screen->width_in_pixels;
   settings.screen_height = screen->height_in_pixels;
   xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
@@ -557,7 +557,7 @@ int main(int argc, char **argv) {
   }
 
   /* Create cairo stuff. */
-  cairo_surface_t *cairo_surface = cairo_xcb_surface_create(connection, window,visual, WIDTH, HEIGHT);
+  cairo_surface_t *cairo_surface = cairo_xcb_surface_create(connection, window,visual, settings.width, settings.height);
   if (cairo_surface == NULL) {
     goto cleanup;
   }
