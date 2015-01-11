@@ -35,8 +35,8 @@ To create multiple results simply chain them together: `{ title1 | output1 }{ ti
 Other ways to use lighthouse
 ---
 Because everything is handled through standard in and out, you can use pretty much any
-executable.  If you want to use a python file `cmd.py`, simply point to it in `~/.config/lighthouse/lighthouserc`
-by making the line `cmd=cmd.py`.  (Be sure to include #!/usr/bin/python at the top of your script!)
+executable.  If you want to use a python file `~/.config/lighthouse/cmd.py`, simply point to it in `~/.config/lighthouse/lighthouserc`
+by making the line `cmd=~/.config/lighthouse/cmd.py`.  (Be sure to include #!/usr/bin/python at the top of your script!)  If you'd like some inspiration, check out the script in `config/lighthouse/cmd.py`.
 
 Options
 ---
