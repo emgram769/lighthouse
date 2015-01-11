@@ -286,7 +286,8 @@ int write_to_remote(FILE *child, char *format, ...) {
 
 static inline int process_key_stroke(char *query_buffer, unsigned int *query_index, unsigned int *query_cursor_index, xcb_keysym_t key, xcb_connection_t *connection, cairo_t *cairo_context, cairo_surface_t *cairo_surface, FILE *to_write) {
   /* Check when we should update. */
-  int changed = 0;
+  int redraw = 0;
+  int resend = 0;
 
   switch (key) {
     case 65293: /* Enter. */
@@ -298,13 +299,13 @@ static inline int process_key_stroke(char *query_buffer, unsigned int *query_ind
     case 65361: /* Left. */
       if (*query_cursor_index > 0) {
         (*query_cursor_index)--;
-        changed = 1;
+        redraw = 1;
       }
       break;
     case 65363: /* Right. */
       if (*query_cursor_index < *query_index) {
         (*query_cursor_index)++;
-        changed = 1;
+        redraw = 1;
       }
       break;
     case 65362: /* Up. */
@@ -327,7 +328,8 @@ static inline int process_key_stroke(char *query_buffer, unsigned int *query_ind
         (*query_cursor_index)--;
         (*query_index)--;
         query_buffer[(*query_index)] = 0;
-        changed = 1;
+        redraw = 1;
+        resend = 1;
       } else if (*query_index == 0) { /* Backspace with nothing? */
         return 0;
       }
@@ -337,18 +339,22 @@ static inline int process_key_stroke(char *query_buffer, unsigned int *query_ind
         memmove(&query_buffer[(*query_cursor_index) + 1], &query_buffer[*query_cursor_index], *query_index - *query_cursor_index + 1);
         query_buffer[(*query_cursor_index)++] = key;
         (*query_index)++;
-        changed = 1;
+        redraw = 1;
+        resend = 1;
       }
       break;
   }
 
-  if (changed) {
+  if (redraw) {
     draw_query_text(cairo_context, query_buffer, *query_cursor_index);
+    xcb_flush(connection);
+    cairo_surface_flush(cairo_surface);
+  }
+
+  if (resend) {
     if (write_to_remote(to_write, "%s\n", query_buffer)) {
       fprintf(stderr, "Failed to write.\n");
     }
-    xcb_flush(connection);
-    cairo_surface_flush(cairo_surface);
   }
 
   return 1;
