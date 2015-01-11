@@ -18,7 +18,20 @@ def clear_output():
 def append_output(title, action):
   title = title.replace("{", "<").replace("}", ">").replace("|", ":")
   action = action.replace("{", "<").replace("}", ">").replace("|", ":")
-  resultStr.value += "{"+title+"|"+action+"}"
+  if resultStr.value == "":
+    resultStr.value = "{"+title+"|"+action+"}"
+  else: # ignore the bottom two default options
+    arr = resultStr.value.split("{")
+    insert = -2
+    if (len(arr) <= 2):
+      insert = -1
+    arr.insert(insert, title+"|"+action+"}")
+    resultStr.value = "{".join(arr)# + "{"+title+"|"+action+"}"
+
+def prepend_output(title, action):
+  title = title.replace("{", "<").replace("}", ">").replace("|", ":")
+  action = action.replace("{", "<").replace("}", ">").replace("|", ":")
+  resultStr.value = "{"+title+"|"+action+"}" + resultStr.value
 
 def update_output():
   print resultStr.value
@@ -71,12 +84,18 @@ while 1:
   find_thr = Process(target=find, args=(userInput,))
   find_thr.start()
 
+  # Could be a command...
+  append_output("execute '"+userInput+"'", userInput);
+
+  # Could be bash...
+  append_output("run '"+userInput+"' in a shell", "urxvt -e bash -c '"+userInput+" && bash'");
+
   # Scan for keywords
   for keyword in special:
     if userInput[0:len(keyword)] == keyword:
       out = special[keyword](userInput)
       if out != None:
-        append_output(*out);
+        prepend_output(*out);
 
   # Is this python?
   try:
@@ -84,15 +103,10 @@ while 1:
     if (type(out) != str and str(out)[0] == '<'):
       pass # We don't want gibberish type stuff
     else:
-      append_output("python: "+str(out), "urxvt -e python2.7 -i -c 'print "+userInput+"'")
+      prepend_output("python: "+str(out), "urxvt -e python2.7 -i -c 'print "+userInput+"'")
   except Exception as e:
     pass
 
-  # Could be a command...
-  append_output("execute '"+userInput+"'", userInput);
-
-  # Could be bash...
-  append_output("run '"+userInput+"' in a shell", "urxvt -e bash -c '"+userInput+" && bash'");
  
   update_output()
   
