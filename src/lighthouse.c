@@ -528,7 +528,8 @@ int main(int argc, char **argv) {
   values[0] = screen->white_pixel;
   values[1] = XCB_EVENT_MASK_EXPOSURE
             | XCB_EVENT_MASK_KEY_PRESS
-            | XCB_EVENT_MASK_KEY_RELEASE;
+            | XCB_EVENT_MASK_KEY_RELEASE
+            | XCB_EVENT_MASK_BUTTON_PRESS;
   xcb_void_cookie_t window_cookie = xcb_create_window_checked(connection,
     XCB_COPY_FROM_PARENT, window, screen->root, 0, 0, settings.width, settings.height, 0,
     XCB_WINDOW_CLASS_INPUT_OUTPUT, screen->root_visual,
@@ -633,6 +634,12 @@ int main(int argc, char **argv) {
           exit_code = ret;
           goto cleanup;
         }
+        break;
+      }
+      case XCB_EVENT_MASK_BUTTON_PRESS: {
+        /* Get the input focus. */
+        xcb_void_cookie_t focus_cookie = xcb_set_input_focus_checked(connection, XCB_INPUT_FOCUS_POINTER_ROOT, window, XCB_CURRENT_TIME);
+        check_xcb_cookie(focus_cookie, connection, "Failed to grab focus.");
         break;
       }
       default:
