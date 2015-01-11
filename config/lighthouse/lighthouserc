@@ -1,6 +1,6 @@
 font_name=monospace
 font_size=18
-cmd=~/.config/lighthouse/cmd.py
+cmd=~/.config/lighthouse/cmd
 query_fg=0.9,0.9,0.9
 query_bg=0.1,0.1,0.1
 result_fg=0.5,0.5,0.5
