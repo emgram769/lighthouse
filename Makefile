@@ -12,8 +12,10 @@ LDFLAGS+=-lxcb -lcairo -lpthread
 
 all: lighthouse
 
-config:
+config: lighthouse .FORCE
 	cp -ir config/* ~/.config/
+
+.FORCE:
 
 lighthouse: $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
