@@ -381,6 +381,8 @@ static inline int process_key_stroke(char *query_buffer, unsigned int *query_ind
   return 1;
 }
 
+int child_pid;
+
 int spawn_piped_process(char *file, int *to_child_fd, int *from_child_fd) {
   /* Create pipes for IPC with the user process. */
   int in_pipe[2];
@@ -417,6 +419,8 @@ int spawn_piped_process(char *file, int *to_child_fd, int *from_child_fd) {
     close(in_pipe[0]);
     return -1;
   }
+
+  child_pid = childpid;
 
   /* We don't need to read from in_pipe or write to out_pipe. */
   close(in_pipe[0]);
@@ -524,7 +528,7 @@ static void initialize_settings(void) {
 }
 
 void kill_zombie(void) {
-  kill(0, SIGKILL);
+  kill(child_pid, SIGKILL);
   while(wait(NULL) == -1);
 }
 
