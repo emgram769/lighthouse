@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 """
 Google AJAX Search Module
 http://code.google.com/apis/ajaxsearch/documentation/reference.html
