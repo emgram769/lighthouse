@@ -20,6 +20,28 @@ You may also need to make the `cmd` script executable.  (If you replace this scr
 
     chmod +x ~/.config/lighthouse/cmd
 
+Dependencies
+---
+
+Arch:
+
+    libx11
+    libxcb
+    cairo
+
+Ubuntu:
+
+    libx11-dev
+    libx11-xcb-dev
+    libcairo2-dev
+
+NixOS:
+
+    nixos.pkgs.xlibs.libX11
+    nixos.pkgs.xlibs.libxcb
+    nixos.pkgs.xlibs.libxproto
+    nixos.pkgs.cairo
+
 # How to use
 Typically you'll want to map a hotkey to run
 
