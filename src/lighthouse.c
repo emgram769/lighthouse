@@ -21,8 +21,13 @@
 #define MAX_HEIGHT        800
 #define WIDTH             500
 #define FONT_SIZE         18
+#define HALF_PERCENT      50
 #define MAX_QUERY         1024
+#define HORIZ_PADDING     5
+
+/* Size of the buffers. */
 #define MAX_CONFIG_SIZE   10*1024
+#define MAX_RESULT_SIZE   10*1024
 #define CONFIG_FILE       "./.config/lighthouse/lighthouserc"
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
@@ -62,6 +67,7 @@ typedef struct {
   /* Font. */
   char *font_name;
   unsigned int font_size;
+  unsigned int horiz_padding;
 
   /* Size. */
   unsigned int height;
@@ -72,6 +78,9 @@ typedef struct {
   /* Percentage offset ont the screen. */
   unsigned int x;
   unsigned int y;
+
+  /* Which desktop to run on. */
+  unsigned int desktop;
 } settings_t;
 
 static char config_buf[MAX_CONFIG_SIZE];
@@ -81,7 +90,7 @@ static settings_t settings;
 struct {
   pthread_mutex_t draw_mutex;
   pthread_mutex_t result_mutex;
-  char result_buf[1024 * 100];
+  char result_buf[MAX_RESULT_SIZE];
   result_t *results;
   unsigned int result_count;
   unsigned int result_highlight;
@@ -110,7 +119,7 @@ static void draw_typed_line(cairo_t *cr, char *text, unsigned int line, unsigned
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
   cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
 
-  unsigned int x_offset = 5;
+  unsigned int x_offset = settings.horiz_padding;
   /* Find the cursor relative to the text. */
   cairo_text_extents_t extents;
   char saved_char = text[cursor];
@@ -422,6 +431,8 @@ static void set_setting(char *param, char *val) {
     settings.font_name = val;
   } else if (!strcmp("font_size", param)) {
     sscanf(val, "%u", &settings.font_size);
+  } else if (!strcmp("horiz_padding", param)) {
+    sscanf(val, "%u", &settings.horiz_padding);
   } else if (!strcmp("height", param)) {
     sscanf(val, "%u", &settings.height);
   } else if (!strcmp("width", param)) {
@@ -444,23 +455,30 @@ static void set_setting(char *param, char *val) {
     sscanf(val, "%f,%f,%f", &settings.highlight_fg.r, &settings.highlight_fg.g, &settings.highlight_fg.b);
   } else if (!strcmp("highlight_bg", param)) {
     sscanf(val, "%f,%f,%f", &settings.highlight_bg.r, &settings.highlight_bg.g, &settings.highlight_bg.b);
+  } else if (!strcmp("desktop", param)) {
+    sscanf(val, "%u", &settings.desktop);
   }
 }
 
 static void initialize_settings(void) {
   /* Set default settings. */
-  settings.query_fg.r = settings.result_fg.r = settings.highlight_fg.r = 0.1;
-  settings.query_fg.g = settings.result_fg.g = settings.highlight_fg.g = 0.1;
-  settings.query_fg.b = settings.result_fg.b = settings.highlight_fg.b = 0.1;
+  settings.query_fg.r = settings.highlight_fg.r = 0.1;
+  settings.query_fg.g = settings.highlight_fg.g = 0.1;
+  settings.query_fg.b = settings.highlight_fg.b = 0.1;
+  settings.result_fg.r = 0.3;
+  settings.result_fg.g = 0.3;
+  settings.result_fg.b = 0.3;
   settings.query_bg.r = settings.result_bg.r = settings.highlight_bg.r = 1.0;
   settings.query_bg.g = settings.result_bg.g = settings.highlight_bg.g = 1.0;
   settings.query_bg.b = settings.result_bg.b = settings.highlight_bg.b = 1.0;
-  settings.font_size = 18;
-  settings.max_height = 800;
-  settings.height = 30;
-  settings.width = 500;
-  settings.x = 50;
-  settings.y = 50;
+  settings.font_size = FONT_SIZE;
+  settings.horiz_padding = HORIZ_PADDING;
+  settings.max_height = MAX_HEIGHT;
+  settings.height = HEIGHT;
+  settings.width = WIDTH;
+  settings.x = HALF_PERCENT;
+  settings.y = HALF_PERCENT;
+  settings.desktop = 0;
 
   /* Read in from the config file. */
   if (chdir(getenv("HOME"))) {
@@ -555,7 +573,7 @@ int main(int argc, char **argv) {
   xcb_intern_atom_cookie_t atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_WINDOW_TYPE"), "_NET_WM_WINDOW_TYPE");
   xcb_intern_atom_reply_t *atom_reply = xcb_intern_atom_reply(connection, atom_cookie, NULL); 
   if (!atom_reply) {
-    fprintf(stderr, "Unable to set window type. You will need to manually set your window manager to run lighthouse as you'd like.");
+    fprintf(stderr, "Unable to set window type. You will need to manually set your window manager to run lighthouse as you'd like.\n");
   } else {
     window_type_atom = atom_reply->atom;
     free(atom_reply);
@@ -567,10 +585,42 @@ int main(int argc, char **argv) {
       free(atom_reply);
       xcb_change_property_checked(connection, XCB_PROP_MODE_REPLACE, window, window_type_atom, XCB_ATOM_ATOM, 32, 1, &window_type_dock_atom);
     } else {
-      fprintf(stderr, "Unable to set window type. You will need to manually set your window manager to run lighthouse as you'd like.");
+      fprintf(stderr, "Unable to set window type. You will need to manually set your window manager to run lighthouse as you'd like.\n");
     }
   }
 
+  /* Now set which desktop to run on. */
+  xcb_atom_t desktop_atom;
+  atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_DESKTOP"), "_NET_WM_DESKTOP");
+  atom_reply = xcb_intern_atom_reply(connection, atom_cookie, NULL); 
+  if (!atom_reply) {
+    fprintf(stderr, "Unable to set a specific desktop to launch on.\n");
+  } else {
+    desktop_atom = atom_reply->atom;
+    free(atom_reply);
+    xcb_change_property_checked(connection, XCB_PROP_MODE_REPLACE, window, desktop_atom, XCB_ATOM_ATOM, 32, 1, (const unsigned int []){ settings.desktop });
+  }
+
+  /* Demand attention. */
+  xcb_atom_t state_atom, attention_state_atom;
+  atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_STATE"), "_NET_WM_STATE");
+  atom_reply = xcb_intern_atom_reply(connection, atom_cookie, NULL);
+  if (!atom_reply) {
+    fprintf(stderr, "Unable to grab desktop attention.\n");
+  } else {
+    state_atom = atom_reply->atom;
+    free(atom_reply);
+    atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_STATE_DEMANDS_ATTENTION"), "_NET_WM_STATE_DEMANDS_ATTENTION");
+    atom_reply = xcb_intern_atom_reply(connection, atom_cookie, NULL);
+    if (!atom_reply) {
+      fprintf(stderr, "Unable to grab desktop attention.\n");
+    } else {
+      attention_state_atom = atom_reply->atom;
+      free(atom_reply);
+      xcb_change_property_checked(connection, XCB_PROP_MODE_REPLACE, window, state_atom, XCB_ATOM_ATOM, 32, 1, &attention_state_atom);
+    }
+  }
+  
   /* Set window properties. */
   char *title = "lighthouse";
   xcb_change_property(connection, XCB_PROP_MODE_REPLACE, window,
