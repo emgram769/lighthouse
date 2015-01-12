@@ -96,6 +96,7 @@ struct {
   result_t *results;
   unsigned int result_count;
   unsigned int result_highlight;
+  int child_pid;
 } global;
 
 static inline int check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_t *connection, char *error) {
@@ -381,13 +382,12 @@ static inline int process_key_stroke(char *query_buffer, unsigned int *query_ind
   return 1;
 }
 
-int child_pid;
 
 int spawn_piped_process(char *file, int *to_child_fd, int *from_child_fd) {
   /* Create pipes for IPC with the user process. */
   int in_pipe[2];
   int out_pipe[2];
-  pid_t childpid;
+  pid_t child_pid;
 
   if (pipe(in_pipe)) {
     fprintf(stderr, "Couldn't create pipe 1.\n");
@@ -400,12 +400,12 @@ int spawn_piped_process(char *file, int *to_child_fd, int *from_child_fd) {
   }
 
   /* Execute the user process. */
-  if ((childpid = fork()) == -1) {
+  if ((child_pid = fork()) == -1) {
     fprintf(stderr, "Couldn't spawn cmd.\n");
     return -1;
   }
 
-  if (childpid == 0) {
+  if (child_pid == 0) {
     close(in_pipe[1]);
     dup2(in_pipe[0], STDIN_FILENO);
     dup2(out_pipe[1], STDOUT_FILENO);
@@ -420,7 +420,7 @@ int spawn_piped_process(char *file, int *to_child_fd, int *from_child_fd) {
     return -1;
   }
 
-  child_pid = childpid;
+  global.child_pid = child_pid;
 
   /* We don't need to read from in_pipe or write to out_pipe. */
   close(in_pipe[0]);
@@ -528,7 +528,7 @@ static void initialize_settings(void) {
 }
 
 void kill_zombie(void) {
-  kill(child_pid, SIGKILL);
+  kill(global.child_pid, SIGKILL);
   while(wait(NULL) == -1);
 }
 
