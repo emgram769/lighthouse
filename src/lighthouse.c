@@ -311,7 +311,7 @@ static inline int process_key_stroke(char *query_buffer, unsigned int *query_ind
   /* Check when we should update. */
   int redraw = 0;
   int resend = 0;
-
+  
   switch (key) {
     case 65293: /* Enter. */
       if (global.results && global.result_highlight < global.result_count && global.result_highlight >= 0) {
@@ -721,7 +721,7 @@ int main(int argc, char **argv) {
       }
       case XCB_KEY_RELEASE: {
         xcb_key_release_event_t *k = (xcb_key_release_event_t *)event;
-        xcb_keysym_t key = xcb_key_press_lookup_keysym(keysyms, k, k->state);
+        xcb_keysym_t key = xcb_key_press_lookup_keysym(keysyms, k, k->state & ~XCB_MOD_MASK_2);
         int ret = process_key_stroke(query_string, &query_index, &query_cursor_index, key, connection, cairo_context, cairo_surface, to_child);
         if (ret <= 0) {
           exit_code = ret;
