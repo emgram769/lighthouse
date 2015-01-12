@@ -199,9 +199,21 @@ unsigned int parse_response_text(char *text, size_t length, result_t **results) 
   mode = 0; /* 0 -> closed, 1 -> opened no command, 2 -> opened, command */
   result_t *ret = calloc(1, sizeof(result_t));
   unsigned int count = 0;
-  for (index = 0; text[index] != 0; index++) {
+  for (index = 0; text[index] != 0 && index < length; index++) {
+    /* Escape sequence. */
+    if (text[index] == '\\' && index + 1 < length) {
+      switch (text[index+1]) {
+        case '{':
+        case '|':
+        case '}':
+          memmove(&text[index], &text[index+1], length - index);
+          break;
+        default:
+          break;
+      }
+    }
     /* Opening brace. */
-    if (text[index] == '{') {
+    else if (text[index] == '{') {
       if (mode != 0) {
         fprintf(stderr, "Syntax error, found { at index %d.\n %s\n", index, text);
         free(ret);
