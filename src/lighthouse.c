@@ -8,6 +8,8 @@
 #include <wordexp.h>
 
 #include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
 #include <sys/types.h>
 
 #include <xcb/xcb.h>
@@ -277,7 +279,7 @@ void *get_results(void *args) {
     global.result_buf[res] = '\0';
     if (res <= 0) {
       fprintf(stderr, "Error in spawned cmd.\n");
-      exit(1);
+      return NULL;
     }
     result_t *results;
     unsigned int result_count = parse_response_text(global.result_buf, res, &results);
@@ -313,7 +315,7 @@ static inline int process_key_stroke(char *query_buffer, unsigned int *query_ind
     case 65293: /* Enter. */
       if (global.results && global.result_highlight < global.result_count && global.result_highlight >= 0) {
         printf("%s", global.results[global.result_highlight].action);
-        exit(0);
+        return 0;
       }
       break;
     case 65361: /* Left. */
@@ -465,9 +467,9 @@ static void initialize_settings(void) {
   settings.query_fg.r = settings.highlight_fg.r = 0.1;
   settings.query_fg.g = settings.highlight_fg.g = 0.1;
   settings.query_fg.b = settings.highlight_fg.b = 0.1;
-  settings.result_fg.r = 0.3;
-  settings.result_fg.g = 0.3;
-  settings.result_fg.b = 0.3;
+  settings.result_fg.r = 0.5;
+  settings.result_fg.g = 0.5;
+  settings.result_fg.b = 0.5;
   settings.query_bg.r = settings.result_bg.r = settings.highlight_bg.r = 1.0;
   settings.query_bg.g = settings.result_bg.g = settings.highlight_bg.g = 1.0;
   settings.query_bg.b = settings.result_bg.b = settings.highlight_bg.b = 1.0;
@@ -521,8 +523,14 @@ static void initialize_settings(void) {
   }
 }
 
+void kill_zombie(void) {
+  kill(0, SIGKILL);
+  while(wait(NULL) == -1);
+}
+
 int main(int argc, char **argv) {
   int exit_code = 0;
+  atexit(kill_zombie);
   initialize_settings();
 
   /* Set up the remote process. */
@@ -736,7 +744,6 @@ int main(int argc, char **argv) {
 cleanup:
   xcb_disconnect(connection);
   xcb_key_symbols_free(keysyms);
-
   return exit_code;
 }
 
