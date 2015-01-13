@@ -73,6 +73,7 @@ static struct {
   unsigned int result_count;
   unsigned int result_highlight;
   int child_pid;
+  pthread_t results_thr;
 } global;
 
 static struct {
@@ -625,6 +626,7 @@ static void initialize_settings(void) {
 }
 
 void kill_zombie(void) {
+  pthread_kill(global.results_thr, SIGINT);
   kill(global.child_pid, SIGKILL);
   while(wait(NULL) == -1);
 }
@@ -784,7 +786,6 @@ int main(int argc, char **argv) {
     goto cleanup;
   }
 
-  pthread_t results_thr;
   struct result_params results_thr_params;
   results_thr_params.fd = from_child_fd; 
   results_thr_params.cr = cairo_context;
@@ -792,7 +793,7 @@ int main(int argc, char **argv) {
   results_thr_params.connection = connection;
   results_thr_params.window = window;
 
-  if (pthread_create(&results_thr, NULL, &get_results, &results_thr_params)) {
+  if (pthread_create(&global.results_thr, NULL, &get_results, &results_thr_params)) {
     fprintf(stderr, "Couldn't spawn second thread.\n");
     exit(1);
   }
