@@ -7,13 +7,14 @@ CFLAGS+=-I$(INCDIR)
 SRCS=$(wildcard $(SRCDIR)/*.c)
 OBJS=$(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
 
-CFLAGS+=-O2 -Wall
-CFLAGS_DEBUG+=-O0 -Werror -DDEBUG=1
+CFLAGS+=-O2 -Wall -std=c99
+CFLAGS_DEBUG+=-O0 -g3 -Werror -DDEBUG -pedantic
 LDFLAGS+=-lxcb -lxcb-xkb -lxcb-xinerama -lxcb-randr -lcairo -lpthread
 
 all: lighthouse
 
-debug: lighthouse_debug
+debug: CFLAGS += $(CFLAGS_DEBUG)
+debug: lighthouse
 
 config: lighthouse .FORCE
 	cp -ir config/* ~/.config/
@@ -22,9 +23,6 @@ config: lighthouse .FORCE
 
 lighthouse: $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
-
-lighthouse_debug: $(OBJS)
-	$(CC) $(CFLAGS) $(CFLAGS_DBG) $(LDFLAGS) $^ -o $@
 
 $(OBJS): | $(OBJDIR)
 $(OBJDIR):

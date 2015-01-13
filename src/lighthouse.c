@@ -36,10 +36,10 @@
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
-#ifndef DEBUG
-#define debug(...) (void)0
-#else
+#ifdef DEBUG
 #define debug(...) fprintf(stdin, __VA_ARGS__)
+#else
+#define debug(...) (void)0
 #endif
 
 typedef struct {
@@ -291,8 +291,10 @@ void *get_results(void *args) {
   while (1) {
     res = read(fd, global.result_buf, sizeof(global.result_buf));
     global.result_buf[res] = '\0';
-    if (res <= 0) {
+    if (res < 0) {
       fprintf(stderr, "Error in spawned cmd.\n");
+      return NULL;
+    } else if (res == 0) {
       return NULL;
     }
     result_t *results;
@@ -626,7 +628,6 @@ static void initialize_settings(void) {
 }
 
 void kill_zombie(void) {
-  pthread_kill(global.results_thr, SIGINT);
   kill(global.child_pid, SIGKILL);
   while(wait(NULL) == -1);
 }
