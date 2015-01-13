@@ -13,6 +13,8 @@
 #include <sys/types.h>
 
 #include <xcb/xcb.h>
+#include <xcb/xinerama.h>
+#include <xcb/randr.h>
 #include <cairo/cairo.h>
 #include <cairo/cairo-xcb.h>
 #include <pthread.h>
@@ -34,6 +36,12 @@
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
+#ifndef DEBUG
+#define debug(...) (void)0
+#else
+#define debug(...) fprintf(stdin, __VA_ARGS__)
+#endif
+
 typedef struct {
   float r;
   float g;
@@ -54,7 +62,20 @@ struct result_params {
   xcb_window_t window;
 };
 
-typedef struct {
+/* Globals. */
+
+static struct {
+  pthread_mutex_t draw_mutex;
+  pthread_mutex_t result_mutex;
+  char result_buf[MAX_RESULT_SIZE];
+  result_t *results;
+  char config_buf[MAX_CONFIG_SIZE];
+  unsigned int result_count;
+  unsigned int result_highlight;
+  int child_pid;
+} global;
+
+static struct {
   /* The color scheme. */
   color_t query_fg;
   color_t query_bg;
@@ -75,29 +96,20 @@ typedef struct {
   unsigned int height;
   unsigned int max_height;
   unsigned int width;
-  unsigned int screen_height;
-  unsigned int screen_width;
   /* Percentage offset ont the screen. */
   unsigned int x;
   unsigned int y;
 
+  /* For multiple display. */
+  unsigned int screen;
+  unsigned int screen_x;
+  unsigned int screen_y;
+  unsigned int screen_height;
+  unsigned int screen_width;
+
   /* Which desktop to run on. */
   unsigned int desktop;
-} settings_t;
-
-static char config_buf[MAX_CONFIG_SIZE];
-static settings_t settings;
-
-/* Globals. */
-struct {
-  pthread_mutex_t draw_mutex;
-  pthread_mutex_t result_mutex;
-  char result_buf[MAX_RESULT_SIZE];
-  result_t *results;
-  unsigned int result_count;
-  unsigned int result_highlight;
-  int child_pid;
-} global;
+} settings;
 
 static inline int check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_t *connection, char *error) {
   xcb_generic_error_t *xcb_error = xcb_request_check(connection, cookie);
@@ -312,6 +324,8 @@ static inline int process_key_stroke(char *query_buffer, unsigned int *query_ind
   int redraw = 0;
   int resend = 0;
 
+  debug("key: %u\n", key);
+
   switch (key) {
     case 65293: /* Enter. */
       if (global.results && global.result_highlight < global.result_count && global.result_highlight >= 0) {
@@ -447,6 +461,8 @@ static void set_setting(char *param, char *val) {
     sscanf(val, "%u", &settings.x);
   } else if (!strcmp("y", param)) {
     sscanf(val, "%u", &settings.y);
+  } else if (!strcmp("screen", param)) {
+    sscanf(val, "%u", &settings.screen);
   } else if (!strcmp("cmd", param)) {
     settings.cmd = val;
   } else if (!strcmp("query_fg", param)) {
@@ -464,6 +480,86 @@ static void set_setting(char *param, char *val) {
   } else if (!strcmp("desktop", param)) {
     sscanf(val, "%u", &settings.desktop);
   }
+}
+
+static int get_multiscreen_settings(xcb_connection_t *connection, xcb_screen_t *screen) {
+  /* First check randr. */
+  const xcb_query_extension_reply_t *extension_reply = xcb_get_extension_data(connection, &xcb_randr_id);
+  if (extension_reply && extension_reply->present) {
+    debug("Found randr support, searching for displays.\n");
+    /* Find x, y and width, height. */
+    xcb_randr_get_screen_resources_current_reply_t *randr_reply = xcb_randr_get_screen_resources_current_reply(connection, xcb_randr_get_screen_resources_current(connection, screen->root), NULL);
+    if (!randr_reply) {
+      fprintf(stderr, "Failed to get randr set up.\n");
+    } else {
+      int num_outputs = xcb_randr_get_screen_resources_current_outputs_length(randr_reply);
+      if (num_outputs < settings.screen) {
+        fprintf(stderr, "Screen selected not found.\n");
+        /* Default back to the first screen. */
+        settings.screen = 0;
+      }
+      xcb_randr_output_t *outputs = xcb_randr_get_screen_resources_current_outputs(randr_reply);
+      unsigned int output_index = settings.screen;
+      xcb_randr_get_output_info_reply_t *randr_output = NULL;
+      do {
+        if (randr_output) { free(randr_output); }
+        randr_output = xcb_randr_get_output_info_reply(connection, xcb_randr_get_output_info(connection, outputs[output_index], XCB_CURRENT_TIME), NULL);
+        output_index++;
+      } while ((randr_output->connection != XCB_RANDR_CONNECTION_CONNECTED) && (output_index < num_outputs));
+      if (randr_output) {
+        xcb_randr_get_crtc_info_reply_t *randr_crtc = xcb_randr_get_crtc_info_reply(connection, xcb_randr_get_crtc_info(connection, randr_output->crtc, XCB_CURRENT_TIME), NULL);
+        if (!randr_crtc) {
+          fprintf(stderr, "Unable to connect to randr crtc\n");
+        }
+        settings.screen_width = randr_crtc->width;
+        settings.screen_height = randr_crtc->height;
+        settings.screen_x = randr_crtc->x;
+        settings.screen_y = randr_crtc->y;
+        debug("randr screen initialization successful, x: %u y: %u w: %u h: %u.\n", settings.screen_x, settings.screen_y, settings.screen_width, settings.screen_height);
+
+        free(randr_crtc);
+        free(randr_output);
+        free(randr_reply);
+        return 0;
+      }
+      free(randr_output);
+      free(randr_reply);
+    }
+  }
+  debug("Did not find randr support, attempting xinerama\n");
+
+  /* Still here? Let's try xinerama! */
+  extension_reply = xcb_get_extension_data(connection, &xcb_xinerama_id);
+  if (extension_reply && extension_reply->present) {
+    debug("Found xinerama support, searching for displays.\n");
+    xcb_xinerama_is_active_reply_t *xinerama_is_active_reply = xcb_xinerama_is_active_reply(connection, xcb_xinerama_is_active(connection), NULL);
+    if (xinerama_is_active_reply && xinerama_is_active_reply->state) {
+      free(xinerama_is_active_reply);
+      /* Find x, y and width, height. */
+      xcb_xinerama_query_screens_reply_t *screen_reply = xcb_xinerama_query_screens_reply(connection, xcb_xinerama_query_screens_unchecked(connection), NULL);
+      xcb_xinerama_screen_info_iterator_t iter = xcb_xinerama_query_screens_screen_info_iterator(screen_reply);
+      free(screen_reply);
+      if (iter.rem < settings.screen) {
+        fprintf(stderr, "Screen selected not found.\n");
+        /* Default back to the first screen. */
+        settings.screen = 0;
+      }
+      /* Jump to the appropriate screen. */
+      int i = 0;
+      while (i < settings.screen) {
+        xcb_xinerama_screen_info_next(&iter);
+      }
+      settings.screen_width = iter.data->width;
+      settings.screen_height = iter.data->height;
+      settings.screen_x = iter.data->x_org;
+      settings.screen_y = iter.data->y_org;
+      debug("xinerama screen initialization successful, x: %u y: %u w: %u h: %u.\n", settings.screen_x, settings.screen_y, settings.screen_width, settings.screen_height);
+      return 0;
+    }
+  }
+
+  debug("Multiscreen search failed.\n");
+  return 1;
 }
 
 static void initialize_settings(void) {
@@ -485,6 +581,7 @@ static void initialize_settings(void) {
   settings.x = HALF_PERCENT;
   settings.y = HALF_PERCENT;
   settings.desktop = 0;
+  settings.screen = 0;
 
   /* Read in from the config file. */
   if (chdir(getenv("HOME"))) {
@@ -495,30 +592,30 @@ static void initialize_settings(void) {
   size_t ret = 0;
   if (access(CONFIG_FILE, F_OK) != -1) {
     int fd = open(CONFIG_FILE, O_RDONLY);
-    ret = read(fd, config_buf, sizeof(config_buf));
+    ret = read(fd, global.config_buf, sizeof(global.config_buf));
   } else {
     fprintf(stderr, "Couldn't open config file.\n");
   }
   int i, mode;
   mode = 1; /* 0 looking for param. 1 looking for value. 2 skipping chars */
-  char *curr_param = config_buf;
+  char *curr_param = global.config_buf;
   char *curr_val = NULL;
   for (i = 0; i < ret; i++) {
-    switch (config_buf[i]) {
+    switch (global.config_buf[i]) {
       case '=':
-        config_buf[i] = '\0';
+        global.config_buf[i] = '\0';
         mode = 1; /* Now we get the value. */
         break;
       case '\n':
-        config_buf[i] = '\0';
+        global.config_buf[i] = '\0';
         set_setting(curr_param, curr_val);
         mode = 0; /* Now we look for a new param. */
         break;
       default:
         if (mode == 0) {
-          curr_param = &config_buf[i];
+          curr_param = &global.config_buf[i];
         } else if (mode == 1) {
-          curr_val = &config_buf[i];
+          curr_val = &global.config_buf[i];
         }
         mode = 2;
         break;
@@ -633,17 +730,25 @@ int main(int argc, char **argv) {
     }
   }
   
+  /* Get multiscreen information or default to the screen properties. */
+  if (get_multiscreen_settings(connection, screen)) {
+    settings.screen_width = screen->width_in_pixels;
+    settings.screen_height = screen->height_in_pixels;
+    settings.screen_x = 0;
+    settings.screen_y = 0;
+  }
+
   /* Set window properties. */
   char *title = "lighthouse";
   xcb_change_property(connection, XCB_PROP_MODE_REPLACE, window,
     XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, strlen(title), title);
   xcb_change_property(connection, XCB_PROP_MODE_REPLACE, window,
     XCB_ATOM_WM_CLASS, XCB_ATOM_STRING, 8, strlen(title), title);
-  values[0] = settings.x * screen->width_in_pixels / 100 - settings.width / 2;
-  values[1] = settings.y * screen->height_in_pixels / 100 - settings.height / 2;
-  settings.screen_width = screen->width_in_pixels;
-  settings.screen_height = screen->height_in_pixels;
-  xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
+  values[0] = settings.screen_x + settings.x * settings.screen_width / 100 - settings.width / 2;
+  values[1] = settings.screen_y + settings.y * settings.screen_height / 100 - settings.height / 2;
+
+  /* Get window properties. */
+  xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
 
   /* Find the visualtype by iterating through depths. */
   xcb_visualtype_t *visual = NULL;
