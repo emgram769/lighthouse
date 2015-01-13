@@ -6,36 +6,47 @@ from time import sleep
 import logging
 from google import pygoogle
 from multiprocessing import Process, Value, Manager, Array
-from ctypes import c_char
+from ctypes import c_char, c_char_p
 import subprocess
+import json
 
 MAX_OUTPUT = 100 * 1024
 
 resultStr = Array(c_char, MAX_OUTPUT);
+resultStrs = Array(c_char_p, 10);
 
 def clear_output():
-  resultStr.value = ""
+  resultStr.value = json.dumps([])
+
+def sanitize_output(string):
+  string = string.replace("{", "\{")
+  string = string.replace("}", "\}")
+  string = string.replace("|", "\|")
+  return string
+
+def create_result(title, action):
+  return "{" + title + " |" + action + " }"
 
 def append_output(title, action):
-  title = title.replace("{", "<").replace("}", ">").replace("|", ":")
-  action = action.replace("{", "<").replace("}", ">").replace("|", ":")
-  if resultStr.value == "":
-    resultStr.value = "{"+title+"|"+action+"}"
+  title = sanitize_output(title)
+  action = sanitize_output(action)
+  results = json.loads(resultStr.value)
+  if len(results) < 2:
+    results.append(create_result(title, action))
   else: # ignore the bottom two default options
-    arr = resultStr.value.split("{")
-    insert = -2
-    if (len(arr) <= 2):
-      insert = -1
-    arr.insert(insert, title+"|"+action+"}")
-    resultStr.value = "{".join(arr)
+    results.insert(-2, create_result(title, action))
+  resultStr.value = json.dumps(results)
 
 def prepend_output(title, action):
-  title = title.replace("{", "<").replace("}", ">").replace("|", ":")
-  action = action.replace("{", "<").replace("}", ">").replace("|", ":")
-  resultStr.value = "{"+title+"|"+action+"}" + resultStr.value
+  title = sanitize_output(title)
+  action = sanitize_output(action)
+  results = json.loads(resultStr.value)
+  results = [create_result(title, action)] + results
+  resultStr.value = json.dumps(results)
 
 def update_output():
-  print resultStr.value
+  results = json.loads(resultStr.value)
+  print "".join(results)
   sys.stdout.flush()
   
 google_thr = None
@@ -54,7 +65,7 @@ def find(query):
   find_array = find_out.split("\n")[:-1]
   if (len(find_array) == 0): return
   for i in xrange(min(5, len(find_array))):
-    append_output(str(find_array[i]),"urxvt -e bash -c 'cd $(dirname "+find_array[i]+"); bash'");
+    append_output(str(find_array[i]),"urxvt -e bash -c 'if [[ $(file "+find_array[i]+" | grep text) != \"\" ]]; then vim "+find_array[i]+"; else cd $(dirname "+find_array[i]+"); bash; fi;'");
   update_output()
 
 special = {
@@ -81,12 +92,6 @@ while 1:
     update_output()
     continue
 
-  # Spawn worker threads
-  google_thr = Process(target=google, args=(userInput,))
-  google_thr.start()
-  find_thr = Process(target=find, args=(userInput,))
-  find_thr.start()
-
   # Could be a command...
   append_output("execute '"+userInput+"'", userInput);
 
@@ -110,6 +115,11 @@ while 1:
   except Exception as e:
     pass
 
+  # Spawn worker threads
+  google_thr = Process(target=google, args=(userInput,))
+  google_thr.start()
+  find_thr = Process(target=find, args=(userInput,))
+  find_thr.start()
  
   update_output()
   
