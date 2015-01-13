@@ -25,15 +25,21 @@ Dependencies
 
 Arch:
 
+    libpth
     libx11
     libxcb
     cairo
+    libxcb-xkb
+    libxcb-xinerama
 
 Ubuntu:
 
+    libpth-dev
     libx11-dev
     libx11-xcb-dev
     libcairo2-dev
+    libxcb-xkb-dev
+    libxcb-xineram0-dev
 
 NixOS:
 
