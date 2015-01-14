@@ -1,3 +1,33 @@
+/** @file lighthouse.c
+ *  @author Bram Wasti <bwasti@cmu.edu>
+ *
+ *  @brief This file contains the implementation of lighthouse, a simple
+ *         scriptable popup dialogue. See the README for information on usage.
+ *
+ *  @section LICENSE
+ *
+ *  Copyright (c) <year> <copyright holders>
+ *  
+ *  Permission is hereby granted, free of charge, to any person obtaining a copy
+ *  of this software and associated documentation files (the "Software"), to deal
+ *  in the Software without restriction, including without limitation the rights
+ *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *  copies of the Software, and to permit persons to whom the Software is
+ *  furnished to do so, subject to the following conditions:
+ *  
+ *  The above copyright notice and this permission notice shall be included in
+ *  all copies or substantial portions of the Software.
+ *  
+ *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ *  THE SOFTWARE.
+ *
+ */
+#define _POSIX_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -19,8 +49,9 @@
 #include <cairo/cairo-xcb.h>
 #include <pthread.h>
 
-#include <xcb_keysyms.h>
+#include <xcb_keysyms.h>  /* xcb_key_symbols_alloc, xcb_key_press_lookup_keysym */
 
+/** @brief Defaults for settings. */
 #define HEIGHT            30
 #define MAX_HEIGHT        800
 #define WIDTH             500
@@ -29,9 +60,11 @@
 #define MAX_QUERY         1024
 #define HORIZ_PADDING     5
 
-/* Size of the buffers. */
+/* @brief Size of the buffers. */
 #define MAX_CONFIG_SIZE   10*1024
 #define MAX_RESULT_SIZE   10*1024
+
+/* @brief Name of the file to search for. */
 #define CONFIG_FILE       "./.config/lighthouse/lighthouserc"
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
@@ -42,40 +75,42 @@
 #define debug(...) (void)0
 #endif
 
+/* @brief Type used to pass around cairo color information conveniently. */
 typedef struct {
   float r;
   float g;
   float b;
 } color_t;
 
+/* @brief Type used to maintain a list of results in a usable form. */
 typedef struct {
   char *action;
   char *text;
-  char *graphic;
 } result_t;
 
+/* @brief This struct is exclusively used to spawn a thread. */
 struct result_params {
-  int fd;
+  int32_t fd;
   cairo_t *cr;
   cairo_surface_t *cr_surface;
   xcb_connection_t *connection;
   xcb_window_t window;
 };
 
-/* Globals. */
-
+/* @brief A struct of globals that are used throughout the program. */
 static struct {
   pthread_mutex_t draw_mutex;
   pthread_mutex_t result_mutex;
   char result_buf[MAX_RESULT_SIZE];
   result_t *results;
   char config_buf[MAX_CONFIG_SIZE];
-  unsigned int result_count;
-  unsigned int result_highlight;
-  int child_pid;
+  uint32_t result_count;
+  uint32_t result_highlight;
+  int32_t child_pid;
   pthread_t results_thr;
 } global;
 
+/* @brief A struct of settings that are set and used when the program starts. */
 static struct {
   /* The color scheme. */
   color_t query_fg;
@@ -90,29 +125,36 @@ static struct {
 
   /* Font. */
   char *font_name;
-  unsigned int font_size;
-  unsigned int horiz_padding;
+  uint32_t font_size;
+  uint32_t horiz_padding;
 
   /* Size. */
-  unsigned int height;
-  unsigned int max_height;
-  unsigned int width;
+  uint32_t height;
+  uint32_t max_height;
+  uint32_t width;
   /* Percentage offset ont the screen. */
-  unsigned int x;
-  unsigned int y;
+  uint32_t x;
+  uint32_t y;
 
   /* For multiple display. */
-  unsigned int screen;
-  unsigned int screen_x;
-  unsigned int screen_y;
-  unsigned int screen_height;
-  unsigned int screen_width;
+  uint32_t screen;
+  uint32_t screen_x;
+  uint32_t screen_y;
+  uint32_t screen_height;
+  uint32_t screen_width;
 
   /* Which desktop to run on. */
-  unsigned int desktop;
+  uint32_t desktop;
 } settings;
 
-static inline int check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_t *connection, char *error) {
+/* @brief Check the xcb cookie and prints an error if it has one.
+ *
+ * @param cookie A generic xcb cookie.
+ * @param connection A connection to the Xorg server.
+ * @param The error to be printed if the cookie contains an error.
+ * @return
+ */
+static inline int32_t check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_t *connection, char *error) {
   xcb_generic_error_t *xcb_error = xcb_request_check(connection, cookie);
   if (xcb_error) {
     fprintf(stderr, "[error:%"PRIu8"] %s\n", xcb_error->error_code, error);
@@ -122,7 +164,17 @@ static inline int check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_t *c
   return 0;
 }
 
-static void draw_typed_line(cairo_t *cr, char *text, unsigned int line, unsigned int cursor, color_t *foreground, color_t *background) {
+/* @brief Draw a line of text with a cursor to a cairo context.
+ *
+ * @param cr A cairo context for drawing to the screen.
+ * @param text The text to be drawn.
+ * @param line The index of the line to be drawn (counting from the top).
+ * @param cursor The index of the cursor into the text to be drawn.
+ * @param foreground The color of the text.
+ * @param background The color of the background.
+ * @return Void.
+ */
+static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cursor, color_t *foreground, color_t *background) {
   pthread_mutex_lock(&global.draw_mutex);
 
   /* Set the background. */
@@ -135,14 +187,14 @@ static void draw_typed_line(cairo_t *cr, char *text, unsigned int line, unsigned
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
   cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
 
-  unsigned int x_offset = settings.horiz_padding;
+  uint32_t x_offset = settings.horiz_padding;
   /* Find the cursor relative to the text. */
   cairo_text_extents_t extents;
   char saved_char = text[cursor];
   text[cursor] = '\0';
   cairo_text_extents(cr, text, &extents);
   text[cursor] = saved_char;
-  unsigned int cursor_x = extents.x_advance;
+  uint32_t cursor_x = extents.x_advance;
 
   /* Find the text offset. */
   cairo_text_extents(cr, text, &extents);
@@ -165,7 +217,16 @@ static void draw_typed_line(cairo_t *cr, char *text, unsigned int line, unsigned
   pthread_mutex_unlock(&global.draw_mutex);
 }
 
-static void draw_line(cairo_t *cr, const char *text, unsigned int line, color_t *foreground, color_t *background) {
+/* @brief Draw a line of text to a cairo context.
+ *
+ * @param cr A cairo context for drawing to the screen.
+ * @param text The text to be drawn.
+ * @param line The index of the line to be drawn (counting from the top).
+ * @param foreground The color of the text.
+ * @param background The color of the background.
+ * @return Void.
+ */
+static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *foreground, color_t *background) {
   pthread_mutex_lock(&global.draw_mutex);
 
   cairo_set_source_rgb(cr, background->r, background->g, background->b);
@@ -174,7 +235,7 @@ static void draw_line(cairo_t *cr, const char *text, unsigned int line, color_t 
   cairo_fill(cr);
   cairo_text_extents_t extents;
   cairo_text_extents(cr, text, &extents);
-  unsigned int x_offset = 5;
+  uint32_t x_offset = 5;
   cairo_move_to(cr, x_offset, (line + 1) * settings.height - settings.font_size/2);
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
   cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
@@ -184,22 +245,42 @@ static void draw_line(cairo_t *cr, const char *text, unsigned int line, color_t 
   pthread_mutex_unlock(&global.draw_mutex);
 }
 
-static void draw_query_text(cairo_t *cr, cairo_surface_t *surface, const char *text, unsigned int cursor) {
+/* @brief Draw the query text (what is typed).
+ *
+ * @param cr A cairo context for drawing to the screen.
+ * @param surface A cairo surface for drawing to the screen.
+ * @param text The string to draw into the query field (what is being typed).
+ * @param cursor The current index of the cursor
+ * @return Void.
+ */
+static void draw_query_text(cairo_t *cr, cairo_surface_t *surface, const char *text, uint32_t cursor) {
   draw_typed_line(cr, (char *)text, 0, cursor, &settings.query_fg, &settings.query_bg);
   cairo_surface_flush(surface);
 }
 
-static void draw_response_text(xcb_connection_t *connection, xcb_window_t window, cairo_t *cr, cairo_surface_t *surface, result_t *results, unsigned int result_count) {
+/* @brief Draw the responses to the query.
+ *
+ * Note: the window may be resized in this function.
+ *
+ * @param connection A connection to the Xorg server.
+ * @param window An xcb window created by xcb_generate_id.
+ * @param cr A cairo context for drawing to the screen.
+ * @param surface A cairo surface for drawing to the screen.
+ * @param results An array of results to be drawn.
+ * @param result_count The number of results to be drawn.
+ * @return Void.
+ */
+static void draw_response_text(xcb_connection_t *connection, xcb_window_t window, cairo_t *cr, cairo_surface_t *surface, result_t *results, uint32_t result_count) {
 
   if (window != 0) {
-    unsigned int new_height = min(settings.height * (result_count + 1), settings.max_height);
+    uint32_t new_height = min(settings.height * (result_count + 1), settings.max_height);
     uint32_t values[] = { settings.width, new_height};
 
     xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
     cairo_xcb_surface_set_size(surface, settings.width, new_height);
   }
 
-  int i;
+  int32_t i;
   if (global.result_count - 1 < global.result_highlight) {
     global.result_highlight = global.result_count - 1;
   }
@@ -214,16 +295,35 @@ static void draw_response_text(xcb_connection_t *connection, xcb_window_t window
   xcb_flush(connection);
 }
 
-static void redraw_all(xcb_connection_t *connection, xcb_window_t window, cairo_t *cr, cairo_surface_t *surface, char *query_string, unsigned int query_cursor_index) {
+/* @brief Calls the associated redraw functions of both query and response text.
+ *
+ * @param connection A connection to the Xorg server.
+ * @param window An xcb window created by xcb_generate_id.
+ * @param cr A cairo context for drawing to the screen.
+ * @param surface A cairo surface for drawing to the screen.
+ * @param query_string The string to draw into the query field (what is being typed).
+ * @param query_cursor_index The current index of the cursor
+ * @return Void.
+ */
+static void redraw_all(xcb_connection_t *connection, xcb_window_t window, cairo_t *cr, cairo_surface_t *surface, char *query_string, uint32_t query_cursor_index) {
   draw_query_text(cr, surface, query_string, query_cursor_index);
   draw_response_text(connection, window, cr, surface, global.results, global.result_count);
 }
 
-unsigned int parse_response_text(char *text, size_t length, result_t **results) {
-  int index, mode;
+/* @brief Parses text to populate a results structure.
+ *
+ * note: An allocation is done in this function, so results should be freed.
+ *
+ * @param text The text to be parsed.
+ * @param length The length of the text passed in (in bytes).
+ * @param results A reference to the results to be populated.
+ * @return Number of results parsed.
+ */
+static uint32_t parse_response_text(char *text, size_t length, result_t **results) {
+  int32_t index, mode;
   mode = 0; /* 0 -> closed, 1 -> opened no command, 2 -> opened, command */
   result_t *ret = calloc(1, sizeof(result_t));
-  unsigned int count = 0;
+  uint32_t count = 0;
   for (index = 0; text[index] != 0 && index < length; index++) {
     /* Escape sequence. */
     if (text[index] == '\\' && index + 1 < length) {
@@ -279,8 +379,15 @@ unsigned int parse_response_text(char *text, size_t length, result_t **results) 
   return count;
 }
 
+/* @brief Reads from the child process's standard out in a loop.  Meant to be used
+ *        as a spawned thread.
+ *
+ * @param args Immediately cast to a result_params_t type struct.  See that struct
+ *        for more information.
+ * @return NULL.
+ */
 void *get_results(void *args) {
-  int fd = ((struct result_params *)args)->fd;
+  int32_t fd = ((struct result_params *)args)->fd;
   cairo_t *cairo_context = ((struct result_params *)args)->cr;
   cairo_surface_t *cairo_surface = ((struct result_params *)args)->cr_surface;
   xcb_connection_t *connection = ((struct result_params *)args)->connection;
@@ -297,8 +404,8 @@ void *get_results(void *args) {
     } else if (res == 0) {
       return NULL;
     }
-    result_t *results;
-    unsigned int result_count = parse_response_text(global.result_buf, res, &results);
+    result_t *results = NULL;
+    uint32_t result_count = parse_response_text(global.result_buf, res, &results);
     if (global.results && results != global.results) {
       free(global.results);
     }
@@ -308,7 +415,14 @@ void *get_results(void *args) {
   }
 }
 
-int write_to_remote(FILE *child, char *format, ...) {
+/* @brief Writes to the passed in file descriptor.
+ *
+ * Note: this function is used exclusively to write to the child process.
+ *
+ * @param child The file descriptor to write to.
+ * @return 0 on success and 1 on failure.
+ */
+static int32_t write_to_remote(FILE *child, char *format, ...) {
   va_list args;
   va_start(args, format);
   if (vfprintf(child, format, args) < 0) {
@@ -322,10 +436,27 @@ int write_to_remote(FILE *child, char *format, ...) {
   return 0;
 }
 
-static inline int process_key_stroke(char *query_buffer, unsigned int *query_index, unsigned int *query_cursor_index, xcb_keysym_t key, xcb_connection_t *connection, cairo_t *cairo_context, cairo_surface_t *cairo_surface, FILE *to_write) {
+/* @brief Processes an entered key by:
+ * 
+ * 1) Adding the key to the query buffer (backspace will remove a character).
+ * 2) Drawing the updated query to the screen if necessary.
+ * 3) Writing the updated query to the child process if necessary.
+ * 
+ * @param query_buffer The string of the current query (what is typed).
+ * @param query_index A reference to the current length of the query.
+ * @param query_cursor_index A reference to the current index of the cursor
+          in the query.
+ * @param key The key enetered.
+ * @param connection A connection to the Xorg server.
+ * @param cairo_context A cairo context for drawing to the screen.
+ * @param cairo_surface A cairo surface for drawing to the screen.
+ * @param to_write A descriptor to write to the child process.
+ * @return 0 on success and 1 on failure.
+ */
+static inline int32_t process_key_stroke(char *query_buffer, uint32_t *query_index, uint32_t *query_cursor_index, xcb_keysym_t key, xcb_connection_t *connection, cairo_t *cairo_context, cairo_surface_t *cairo_surface, FILE *to_write) {
   /* Check when we should update. */
-  int redraw = 0;
-  int resend = 0;
+  int32_t redraw = 0;
+  int32_t resend = 0;
 
   debug("key: %u\n", key);
 
@@ -399,11 +530,18 @@ static inline int process_key_stroke(char *query_buffer, unsigned int *query_ind
   return 1;
 }
 
-
-int spawn_piped_process(char *file, int *to_child_fd, int *from_child_fd) {
+/* @brief Spawns a process (via fork) and sets up pipes to allow communication with
+ *        the user defined executable.
+ *
+ * @param file The user defined file to load into the newly spawned process.
+ * @param to_child_fd The fd used to write to the child process.
+ * @param from_child_fd The fd used to read from the child process.
+ * @return 0 on success and 1 on failure.
+ */
+static int32_t spawn_piped_process(char *file, int32_t *to_child_fd, int32_t *from_child_fd) {
   /* Create pipes for IPC with the user process. */
-  int in_pipe[2];
-  int out_pipe[2];
+  int32_t in_pipe[2];
+  int32_t out_pipe[2];
   pid_t child_pid;
 
   if (pipe(in_pipe)) {
@@ -449,6 +587,12 @@ int spawn_piped_process(char *file, int *to_child_fd, int *from_child_fd) {
   return 0;
 }
 
+/* @brief Updates the settings global struct with the passed in parameters.
+ *
+ * @param param The name of the parameter to be updated.
+ * @param val The value of the parameter to be updated.
+ * @return Void.
+ */
 static void set_setting(char *param, char *val) {
   if (!strcmp("font_name", param)) {
     settings.font_name = val;
@@ -485,7 +629,17 @@ static void set_setting(char *param, char *val) {
   }
 }
 
-static int get_multiscreen_settings(xcb_connection_t *connection, xcb_screen_t *screen) {
+/* @brief Attempts to find secondary displays and updates settings.screen_* data
+ *        with the dimensions of the found screens.
+ *
+ * Note: failure is somewhat expected and is handled by simply using the default
+ *       xcb screen's dimension parameters.
+ *
+ * @param connection A connection to the Xorg server.
+ * @param screen A screen created by xcb's xcb_setup_roots function.
+ * @return 0 on success and 1 on failure.
+ */
+static int32_t get_multiscreen_settings(xcb_connection_t *connection, xcb_screen_t *screen) {
   /* First check randr. */
   const xcb_query_extension_reply_t *extension_reply = xcb_get_extension_data(connection, &xcb_randr_id);
   if (extension_reply && extension_reply->present) {
@@ -495,14 +649,14 @@ static int get_multiscreen_settings(xcb_connection_t *connection, xcb_screen_t *
     if (!randr_reply) {
       fprintf(stderr, "Failed to get randr set up.\n");
     } else {
-      int num_outputs = xcb_randr_get_screen_resources_current_outputs_length(randr_reply);
+      int32_t num_outputs = xcb_randr_get_screen_resources_current_outputs_length(randr_reply);
       if (num_outputs < settings.screen) {
         fprintf(stderr, "Screen selected not found.\n");
         /* Default back to the first screen. */
         settings.screen = 0;
       }
       xcb_randr_output_t *outputs = xcb_randr_get_screen_resources_current_outputs(randr_reply);
-      unsigned int output_index = settings.screen;
+      uint32_t output_index = settings.screen;
       xcb_randr_get_output_info_reply_t *randr_output = NULL;
       do {
         if (randr_output) { free(randr_output); }
@@ -548,7 +702,7 @@ static int get_multiscreen_settings(xcb_connection_t *connection, xcb_screen_t *
         settings.screen = 0;
       }
       /* Jump to the appropriate screen. */
-      int i = 0;
+      int32_t i = 0;
       while (i < settings.screen) {
         xcb_xinerama_screen_info_next(&iter);
       }
@@ -565,6 +719,13 @@ static int get_multiscreen_settings(xcb_connection_t *connection, xcb_screen_t *
   return 1;
 }
 
+/* @brief Initializes the settings global structure and read in the configuration
+ *        file.
+ * 
+ * Note: this function does not initialize settings.screen_* data.
+ *
+ * @return Void.
+ */
 static void initialize_settings(void) {
   /* Set default settings. */
   settings.query_fg.r = settings.highlight_fg.r = 0.1;
@@ -594,12 +755,12 @@ static void initialize_settings(void) {
 
   size_t ret = 0;
   if (access(CONFIG_FILE, F_OK) != -1) {
-    int fd = open(CONFIG_FILE, O_RDONLY);
+    int32_t fd = open(CONFIG_FILE, O_RDONLY);
     ret = read(fd, global.config_buf, sizeof(global.config_buf));
   } else {
     fprintf(stderr, "Couldn't open config file.\n");
   }
-  int i, mode;
+  int32_t i, mode;
   mode = 1; /* 0 looking for param. 1 looking for value. 2 skipping chars */
   char *curr_param = global.config_buf;
   char *curr_val = NULL;
@@ -627,18 +788,27 @@ static void initialize_settings(void) {
   }
 }
 
+/* @brief A function called at the end of execution to clean up
+ *        the spawned child process.
+ *
+ * @return Void.
+ */
 void kill_zombie(void) {
   kill(global.child_pid, SIGKILL);
   while(wait(NULL) == -1);
 }
 
+/* @brief The main function. Initialization happens here.
+ *
+ * @return 0 on success and 1 on failure.
+ */
 int main(int argc, char **argv) {
-  int exit_code = 0;
+  int32_t exit_code = 0;
   atexit(kill_zombie);
   initialize_settings();
 
   /* Set up the remote process. */
-  int to_child_fd, from_child_fd;
+  int32_t to_child_fd, from_child_fd;
 
   char *exec_file = settings.cmd;
 
@@ -710,7 +880,7 @@ int main(int argc, char **argv) {
   } else {
     desktop_atom = atom_reply->atom;
     free(atom_reply);
-    xcb_change_property_checked(connection, XCB_PROP_MODE_REPLACE, window, desktop_atom, XCB_ATOM_ATOM, 32, 1, (const unsigned int []){ settings.desktop });
+    xcb_change_property_checked(connection, XCB_PROP_MODE_REPLACE, window, desktop_atom, XCB_ATOM_ATOM, 32, 1, (const uint32_t []){ settings.desktop });
   }
 
   /* Demand attention. */
@@ -804,8 +974,8 @@ int main(int argc, char **argv) {
   /* Query string. */
   char query_string[MAX_QUERY];
   memset(query_string, 0, sizeof(query_string));
-  unsigned int query_index = 0;
-  unsigned int query_cursor_index = 0;
+  uint32_t query_index = 0;
+  uint32_t query_cursor_index = 0;
 
   /* Now draw everything. */
   redraw_all(connection, window, cairo_context, cairo_surface, query_string, query_cursor_index);
@@ -829,7 +999,7 @@ int main(int argc, char **argv) {
       case XCB_KEY_RELEASE: {
         xcb_key_release_event_t *k = (xcb_key_release_event_t *)event;
         xcb_keysym_t key = xcb_key_press_lookup_keysym(keysyms, k, k->state & ~XCB_MOD_MASK_2);
-        int ret = process_key_stroke(query_string, &query_index, &query_cursor_index, key, connection, cairo_context, cairo_surface, to_child);
+        int32_t ret = process_key_stroke(query_string, &query_index, &query_cursor_index, key, connection, cairo_context, cairo_surface, to_child);
         if (ret <= 0) {
           exit_code = ret;
           goto cleanup;
