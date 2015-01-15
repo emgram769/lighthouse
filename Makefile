@@ -13,7 +13,7 @@ LDFLAGS+=-lxcb -lxcb-xkb -lxcb-xinerama -lxcb-randr -lcairo -lpthread
 
 all: lighthouse
 
-debug: CFLAGS += $(CFLAGS_DEBUG)
+debug: CC+=$(CFLAGS_DEBUG)
 debug: lighthouse
 
 config: lighthouse .FORCE

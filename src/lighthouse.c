@@ -70,7 +70,7 @@
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
 #ifdef DEBUG
-#define debug(...) fprintf(stdin, __VA_ARGS__)
+#define debug(...) fprintf(stdout, __VA_ARGS__)
 #else
 #define debug(...) (void)0
 #endif
