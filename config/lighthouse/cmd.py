@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/python2.7
 
 import sys
 import random
@@ -13,7 +13,6 @@ import json
 MAX_OUTPUT = 100 * 1024
 
 resultStr = Array(c_char, MAX_OUTPUT);
-resultStrs = Array(c_char_p, 10);
 
 def clear_output():
   resultStr.value = json.dumps([])
@@ -22,6 +21,7 @@ def sanitize_output(string):
   string = string.replace("{", "\{")
   string = string.replace("}", "\}")
   string = string.replace("|", "\|")
+  string = string.replace("\n", " ")
   return string
 
 def create_result(title, action):
@@ -68,10 +68,23 @@ def find(query):
     append_output(str(find_array[i]),"urxvt -e bash -c 'if [[ $(file "+find_array[i]+" | grep text) != \"\" ]]; then vim "+find_array[i]+"; else cd $(dirname "+find_array[i]+"); bash; fi;'");
   update_output()
 
+def get_process_output(process, formatting, action):
+  process_out = str(subprocess.check_output(process))
+  if "%s" in formatting:
+    out_str = formatting % (process_out)
+  else:
+    out_str = formatting
+  if "%s" in action:
+    out_action = action % (process_out)
+  else:
+    out_action = action
+  return (out_str, out_action)
+
 special = {
   "chrom": (lambda x: ("did you mean firefox?","firefox")),
   "fire": (lambda x: ("firefox","firefox")),
-  "vi": (lambda x: ("vim","urxvt -e vim"))
+  "vi": (lambda x: ("vim","urxvt -e vim")),
+  "bat": (lambda x: get_process_output("acpi", "%s", ""))
 };
 
 while 1:
