@@ -1,7 +1,14 @@
 # lighthouse
-A simple flexible popup dialog to run on X. Demos: https://gfycat.com/WiltedBetterDorado https://u.teknik.io/pAk6A1.webm
+A simple flexible popup dialog to run on X.
+<p align="center">
+  <img src="http://giant.gfycat.com/WiltedBetterDorado.gif" alt="demo"/>
+  <br>
+  (longer demo: https://u.teknik.io/pAk6A1.webm)
 
-(In the demo a hotkey is mapped to `lighthouse | sh` with `lighthouserc` using `cmd.py`, which is included in `config/lighthouse/` but not installed by `make config`. Explanation below.)
+</p>
+
+
+In the demo a hotkey is mapped to `lighthouse | sh` with `lighthouserc` using `cmd.py`, which is included in `config/lighthouse/` but not installed by `make config`. Explanation below.
 # Installation
 
 Build the binary.
