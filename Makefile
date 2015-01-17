@@ -22,7 +22,7 @@ config: lighthouse .FORCE
 .FORCE:
 
 lighthouse: $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 $(OBJS): | $(OBJDIR)
 $(OBJDIR):
