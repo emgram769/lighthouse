@@ -706,6 +706,7 @@ static int32_t get_multiscreen_settings(xcb_connection_t *connection, xcb_screen
       int32_t i = 0;
       while (i < settings.screen) {
         xcb_xinerama_screen_info_next(&iter);
+        i++;
       }
       settings.screen_width = iter.data->width;
       settings.screen_height = iter.data->height;
