@@ -230,7 +230,8 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
   pthread_mutex_lock(&global.draw_mutex);
 
   cairo_set_source_rgb(cr, background->r, background->g, background->b);
-  cairo_rectangle(cr, 0, line * settings.height, settings.width, settings.height);
+  /* Add 2 to fix a weird offsetting bug. TODO: Fix the bug properly. */
+  cairo_rectangle(cr, 0, line * settings.height + 2, settings.width, settings.height);
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
   cairo_text_extents_t extents;
