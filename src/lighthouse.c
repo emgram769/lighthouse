@@ -231,7 +231,7 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
 
   /* Draw the cursor. */
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
-  cairo_rectangle(cr, cursor_x + 4, line * settings.height, 0, settings.height);
+  cairo_rectangle(cr, cursor_x + 4, offset.y - settings.font_size + 2, 0, settings.font_size);
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
 
