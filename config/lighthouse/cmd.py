@@ -61,6 +61,7 @@ def google(query):
   
 find_thr = None
 def find(query):
+  sleep(.5) # Don't be too aggressive...
   find_out = str(subprocess.check_output(["find", "/home", "-name", query]))
   find_array = find_out.split("\n")[:-1]
   if (len(find_array) == 0): return
