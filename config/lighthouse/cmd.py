@@ -56,7 +56,7 @@ def google(query):
   g.pages = 1
   out = g.get_urls()
   if (len(out) >= 1):  
-    append_output(out[0], "firefox " + out[0])
+    append_output(out[0], "xdg-open " + out[0])
     update_output()
   
 find_thr = None
