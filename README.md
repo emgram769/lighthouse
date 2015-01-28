@@ -39,6 +39,12 @@ Arch:
     libxcb-xkb
     libxcb-xinerama
 
+Available in AUR as [lighthouse-git](https://aur.archlinux.org/packages/lighthouse-git/)
+
+```
+$ yaourt -S lighthouse-git
+```
+
 Ubuntu:
 
     libpth-dev
