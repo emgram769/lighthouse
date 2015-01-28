@@ -59,6 +59,7 @@
 #define HALF_PERCENT      50
 #define MAX_QUERY         1024
 #define HORIZ_PADDING     5
+#define CURSOR_PADDING    4
 
 /* @brief Size of the buffers. */
 #define MAX_CONFIG_SIZE   10*1024
@@ -133,6 +134,7 @@ static struct {
   char *font_name;
   uint32_t font_size;
   uint32_t horiz_padding;
+  uint32_t cursor_padding;
 
   /* Size. */
   uint32_t height;
@@ -230,8 +232,9 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
   cairo_show_text(cr, text);
 
   /* Draw the cursor. */
+  uint32_t cursor_y = offset.y - settings.font_size - settings.cursor_padding;
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
-  cairo_rectangle(cr, cursor_x + 4, offset.y - settings.font_size + 2, 0, settings.font_size);
+  cairo_rectangle(cr, cursor_x + 4, cursor_y, 0, settings.font_size + (settings.cursor_padding * 2));
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
 
@@ -622,6 +625,8 @@ static void set_setting(char *param, char *val) {
     sscanf(val, "%u", &settings.font_size);
   } else if (!strcmp("horiz_padding", param)) {
     sscanf(val, "%u", &settings.horiz_padding);
+  } else if (!strcmp("cursor_padding", param)) {
+    sscanf(val, "%u", &settings.cursor_padding);
   } else if (!strcmp("height", param)) {
     sscanf(val, "%u", &settings.height);
   } else if (!strcmp("width", param)) {
@@ -762,6 +767,7 @@ static void initialize_settings(void) {
   settings.query_bg.b = settings.result_bg.b = settings.highlight_bg.b = 1.0;
   settings.font_size = FONT_SIZE;
   settings.horiz_padding = HORIZ_PADDING;
+  settings.cursor_padding = CURSOR_PADDING;
   settings.max_height = MAX_HEIGHT;
   settings.height = HEIGHT;
   settings.width = WIDTH;
