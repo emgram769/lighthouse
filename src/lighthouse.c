@@ -82,6 +82,12 @@ typedef struct {
   float b;
 } color_t;
 
+/* @brief Type used to pass around x,y offsets. */
+typedef struct {
+  uint32_t x;
+  uint32_t y;
+} offset_t;
+
 /* @brief Type used to maintain a list of results in a usable form. */
 typedef struct {
   char *action;
@@ -164,6 +170,21 @@ static inline int32_t check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_
   return 0;
 }
 
+/* @brief Returns the offset for a line of text. 
+ *
+ * @param line the index of the line to be drawn (counting from the top).
+ * @return the line's offset.
+ */
+static inline offset_t calculate_line_offset(uint32_t line) {
+    offset_t result;
+
+    result.x  = settings.horiz_padding;
+    result.y  = settings.height * (line + 1);
+    result.y -= (settings.height - settings.font_size) / 2;
+
+    return result;
+}
+
 /* @brief Draw a line of text with a cursor to a cairo context.
  *
  * @param cr A cairo context for drawing to the screen.
@@ -187,7 +208,7 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
   cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
 
-  uint32_t x_offset = settings.horiz_padding;
+  offset_t offset = calculate_line_offset(line);
   /* Find the cursor relative to the text. */
   cairo_text_extents_t extents;
   char saved_char = text[cursor];
@@ -199,12 +220,12 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
   /* Find the text offset. */
   cairo_text_extents(cr, text, &extents);
   if (settings.width < extents.width) {
-    x_offset = settings.width - extents.x_advance - x_offset;
+    offset.x = settings.width - extents.x_advance - offset.x;
   }
-  cursor_x += x_offset;
+  cursor_x += offset.x;
 
   /* Draw the text. */
-  cairo_move_to(cr, x_offset, (line + 1) * settings.height - settings.font_size/2);
+  cairo_move_to(cr, offset.x, offset.y);
   cairo_set_font_size(cr, settings.font_size);
   cairo_show_text(cr, text);
 
@@ -236,8 +257,8 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
   cairo_fill(cr);
   cairo_text_extents_t extents;
   cairo_text_extents(cr, text, &extents);
-  uint32_t x_offset = 5;
-  cairo_move_to(cr, x_offset, (line + 1) * settings.height - settings.font_size/2);
+  offset_t offset = calculate_line_offset(line);
+  cairo_move_to(cr, offset.x, offset.y);
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
   cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
   cairo_set_font_size(cr, settings.font_size);
