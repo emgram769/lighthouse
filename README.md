@@ -11,6 +11,11 @@ A simple flexible popup dialog to run on X.
 In the demo a hotkey is mapped to `lighthouse | sh` with `lighthouserc` using `cmd.py`, which is included in `config/lighthouse/` but not installed by `make config`. Explanation below.
 # Installation
 
+Available in the AUR as [lighthouse-git](https://aur.archlinux.org/packages/lighthouse-git/).
+
+Manual build
+---
+
 Build the binary.
 
     make
@@ -38,12 +43,6 @@ Arch:
     cairo
     libxcb-xkb
     libxcb-xinerama
-
-Available in AUR as [lighthouse-git](https://aur.archlinux.org/packages/lighthouse-git/)
-
-```
-$ yaourt -S lighthouse-git
-```
 
 Ubuntu:
 
