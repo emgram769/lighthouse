@@ -814,6 +814,9 @@ static int32_t get_multiscreen_settings(xcb_connection_t *connection, xcb_screen
         xcb_randr_get_crtc_info_reply_t *randr_crtc = xcb_randr_get_crtc_info_reply(connection, xcb_randr_get_crtc_info(connection, randr_output->crtc, XCB_CURRENT_TIME), NULL);
         if (!randr_crtc) {
           fprintf(stderr, "Unable to connect to randr crtc\n");
+          free(randr_output);
+          free(randr_reply);
+          goto xinerama;
         }
         settings.screen_width = randr_crtc->width;
         settings.screen_height = randr_crtc->height;
@@ -830,6 +833,7 @@ static int32_t get_multiscreen_settings(xcb_connection_t *connection, xcb_screen
       free(randr_reply);
     }
   }
+xinerama:
   debug("Did not find randr support, attempting xinerama\n");
 
   /* Still here? Let's try xinerama! */
