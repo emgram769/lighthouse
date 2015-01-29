@@ -318,7 +318,7 @@ static draw_t parse_response_line(char **c) {
   draw_type_t type = DRAW_TEXT;
 
   /* We've found a sequence of some kind. */
-  if (**c == '\%') {
+  if (**c == '%') {
     switch (*(*c+1)) {
       case 'I':
         *c += 1;
@@ -332,7 +332,7 @@ static draw_t parse_response_line(char **c) {
     }
   } else {
     /* Escape character. */
-    if (**c == '\\' && *(*c + 1) == '\%') {
+    if (**c == '\\' && *(*c + 1) == '%') {
       /* Skip the \ in the output. */
       data = *c + 1;
       /* Skip the check for %. */
@@ -343,7 +343,7 @@ static draw_t parse_response_line(char **c) {
     type = DRAW_TEXT;
   }
 
-  while (**c != '\0' && **c != '\%' && **c != '\\') {
+  while (**c != '\0' && **c != '%' && **c != '\\') {
     *c += 1;
   }
 
