@@ -654,7 +654,7 @@ static inline int32_t process_key_stroke(char *query_buffer, uint32_t *query_ind
       }
       break;
     default:
-      if (isprint(key) && *query_index < MAX_QUERY) {
+      if (isprint((char)key) && *query_index < MAX_QUERY) {
         memmove(&query_buffer[(*query_cursor_index) + 1], &query_buffer[*query_cursor_index], *query_index - *query_cursor_index + 1);
         query_buffer[(*query_cursor_index)++] = key;
         (*query_index)++;
