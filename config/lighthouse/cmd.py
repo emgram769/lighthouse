@@ -81,6 +81,63 @@ def get_process_output(process, formatting, action):
     out_action = action
   return (out_str, out_action)
 
+def get_xdg_cmd(cmd):
+
+    import re
+
+    try:
+        import xdg.BaseDirectory
+        import xdg.DesktopEntry
+        import xdg.IconTheme
+    except ImportError:
+        return
+
+    def find_desktop_entry(cmd):
+
+        search_name = "%s.desktop" % cmd
+        desktop_files = list(xdg.BaseDirectory.load_data_paths('applications',
+                                                               search_name))
+        if not desktop_files:
+            return
+        else:
+            # Earlier paths take precedence.
+            desktop_file = desktop_files[0]
+            desktop_entry = xdg.DesktopEntry.DesktopEntry(desktop_file)
+            return desktop_entry
+
+    def get_icon(desktop_entry):
+
+        icon_name = desktop_entry.getIcon()
+        if not icon_name:
+            return
+        else:
+            icon_path = xdg.IconTheme.getIconPath(icon_name)
+            return icon_path
+
+    def get_xdg_exec(desktop_entry):
+
+        exec_spec = desktop_entry.getExec()
+        # The XDG exec string contains substitution patterns.
+        exec_path = re.sub("%.", "", exec_spec).strip()
+        return exec_path
+
+    desktop_entry = find_desktop_entry(cmd)
+    if not desktop_entry:
+        return
+
+    exec_path = get_xdg_exec(desktop_entry)
+    if not exec_path:
+        return
+
+    icon = get_icon(desktop_entry)
+    if not icon:
+        menu_entry = cmd
+    else:
+        menu_entry = "%%I%s%%%s" % (icon, cmd)
+
+    return (menu_entry, exec_path)
+
+
 special = {
   "chrom": (lambda x: ("did you mean firefox?","firefox")),
   "fir": (lambda x: ("%I~/.config/lighthouse/firefox.png%firefox","firefox")),
@@ -119,6 +176,11 @@ while 1:
       out = special[keyword](userInput)
       if out != None:
         prepend_output(*out);
+
+  # Look for XDG applications of the given name.
+  xdg_cmd = get_xdg_cmd(userInput)
+  if xdg_cmd:
+    append_output(*xdg_cmd)
 
   # Is this python?
   try:
