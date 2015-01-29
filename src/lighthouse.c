@@ -144,6 +144,9 @@ static struct {
   /* The process to pipe input to. */
   char *cmd;
 
+  /* Options. */
+  int backspace_exit;
+
   /* Font. */
   char *font_name;
   uint32_t font_size;
@@ -646,7 +649,7 @@ static inline int32_t process_key_stroke(char *query_buffer, uint32_t *query_ind
         query_buffer[(*query_index)] = 0;
         redraw = 1;
         resend = 1;
-      } else if (*query_index == 0) { /* Backspace with nothing? */
+      } else if (*query_index == 0 && settings.backspace_exit) { /* Backspace with nothing? */
         return 0;
       }
       break;
@@ -757,6 +760,8 @@ static void set_setting(char *param, char *val) {
     sscanf(val, "%u", &settings.y);
   } else if (!strcmp("screen", param)) {
     sscanf(val, "%u", &settings.screen);
+  } else if (!strcmp("backspace_exit", param)) {
+    sscanf(val, "%d", &settings.backspace_exit);
   } else if (!strcmp("cmd", param)) {
     settings.cmd = val;
   } else if (!strcmp("query_fg", param)) {
@@ -899,6 +904,7 @@ static void initialize_settings(void) {
   settings.y = HALF_PERCENT;
   settings.desktop = 0;
   settings.screen = 0;
+  settings.backspace_exit = 1;
 
   /* Read in from the config file. */
   if (chdir(getenv("HOME"))) {
