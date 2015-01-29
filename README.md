@@ -1,10 +1,8 @@
 # lighthouse
 A simple flexible popup dialog to run on X.
 <p align="center">
-  <img src="http://giant.gfycat.com/WiltedBetterDorado.gif" alt="demo"/>
+  <img src="http://i.imgur.com/JRlGNjo.gif" alt="demo"/>
   <br>
-  (longer demo: https://u.teknik.io/pAk6A1.webm)
-
 </p>
 
 
@@ -105,7 +103,7 @@ running `make config`.
 
 TODO
 ---
-Add image, alignment, colors and other formatting features to the results syntax.
+Add alignment, colors and other formatting features to the results syntax.
 
 BUGS
 ---
