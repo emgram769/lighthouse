@@ -1,7 +1,7 @@
 # lighthouse
 A simple flexible popup dialog to run on X.
 <p align="center">
-  <img src="http://i.imgur.com/JRlGNjo.gif" alt="demo"/>
+  <img src="http://i.imgur.com/Z6W0Ube.gif" alt="demo"/>
   <br>
 </p>
 
