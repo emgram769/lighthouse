@@ -42,6 +42,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <getopt.h>
 
 #include <xcb/xcb.h>
 #include <xcb/xinerama.h>
@@ -883,7 +884,7 @@ xinerama:
  *
  * @return Void.
  */
-static void initialize_settings(void) {
+static void initialize_settings(char *config_file) {
   /* Set default settings. */
   settings.query_fg.r = settings.highlight_fg.r = 0.1;
   settings.query_fg.g = settings.highlight_fg.g = 0.1;
@@ -913,11 +914,11 @@ static void initialize_settings(void) {
   }
 
   size_t ret = 0;
-  if (access(CONFIG_FILE, F_OK) != -1) {
-    int32_t fd = open(CONFIG_FILE, O_RDONLY);
+  if (access(config_file, F_OK) != -1) {
+    int32_t fd = open(config_file, O_RDONLY);
     ret = read(fd, global.config_buf, sizeof(global.config_buf));
   } else {
-    fprintf(stderr, "Couldn't open config file.\n");
+    fprintf(stderr, "Couldn't open config file %s.\n", config_file);
   }
   int32_t i, mode;
   mode = 1; /* 0 looking for param. 1 looking for value. 2 skipping chars */
@@ -943,7 +944,6 @@ static void initialize_settings(void) {
         mode = 2;
         break;
     }
-  (void)settings;
   }
 }
 
@@ -964,7 +964,20 @@ void kill_zombie(void) {
 int main(int argc, char **argv) {
   int32_t exit_code = 0;
   atexit(kill_zombie);
-  initialize_settings();
+
+  int c;
+  char *config_file = CONFIG_FILE;
+  while ((c = getopt(argc, argv, "c:")) != -1) {
+    switch (c) {
+      case 'c':
+        config_file = optarg;
+        break;
+      default:
+        break;
+    }
+  }
+
+  initialize_settings(config_file);
 
   /* Set up the remote process. */
   int32_t to_child_fd, from_child_fd;

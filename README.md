@@ -98,6 +98,9 @@ standard error, and if it succeeds you'll see what lighthouse is outputting.  Ch
 
 Options
 ---
+The `-c` command line flag will allow you to set a custom location for the configurations file.
+An example would be `lighthouse -c ~/lighthouserc2`.
+
 Check out the sample `lighthouserc` in `config/lighthouse`.  Copy it to your directory by
 running `make config`.
 
