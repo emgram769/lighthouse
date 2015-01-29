@@ -83,7 +83,8 @@ def get_process_output(process, formatting, action):
 
 special = {
   "chrom": (lambda x: ("did you mean firefox?","firefox")),
-  "fire": (lambda x: ("firefox","firefox")),
+  "fir": (lambda x: ("%I~/.config/lighthouse/firefox.png%firefox","firefox")),
+  "gim": (lambda x: ("%I~/.config/lighthouse/gimp.png%GIMP", "gimp")),
   "vi": (lambda x: ("vim","urxvt -e vim")),
   "bat": (lambda x: get_process_output("acpi", "%s", ""))
 };
