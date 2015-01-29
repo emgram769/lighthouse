@@ -83,6 +83,9 @@ when that result is selected.  A common use case would therefore be
 `action` will be `[input]`, so you've effectively created a small one time shell prompt.
 To create multiple results simply chain them together: `{ title1 | action1 }{ title2 | action2 }`
 
+There is also image support in the form `{ %Ifile.png% <- an image! | feh file.png }`.
+To use `%` as a character, escape it with `\%`.
+
 Other ways to use lighthouse
 ---
 Because everything is handled through standard in and out, you can use pretty much any

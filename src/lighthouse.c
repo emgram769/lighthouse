@@ -88,6 +88,7 @@ typedef struct {
 typedef struct {
   uint32_t x;
   uint32_t y;
+  uint32_t image_y;
 } offset_t;
 
 /* @brief Type used to maintain a list of results in a usable form. */
@@ -95,6 +96,18 @@ typedef struct {
   char *action;
   char *text;
 } result_t;
+
+/* @brief The type of data to draw. */
+typedef enum {
+  DRAW_TEXT,
+  DRAW_IMAGE
+} draw_type_t;
+
+/* @brief Type used to pass around drawing options. */
+typedef struct {
+  draw_type_t type;
+  char *data;
+} draw_t;
 
 /* @brief This struct is exclusively used to spawn a thread. */
 struct result_params {
@@ -183,6 +196,7 @@ static inline offset_t calculate_line_offset(uint32_t line) {
 
     result.x  = settings.horiz_padding;
     result.y  = settings.height * (line + 1);
+    result.image_y = result.y;
     result.y -= (settings.height - settings.font_size) / 2;
 
     return result;
@@ -242,6 +256,100 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
   pthread_mutex_unlock(&global.draw_mutex);
 }
 
+/* @brief Draw text at the given offset.
+ *
+ * @param cr A cairo context for drawing to the screen.
+ * @param text The text to be drawn.
+ * @param foreground The color of the text.
+ * @return The advance in the x direction.
+ */
+static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_t *foreground) {
+  cairo_text_extents_t extents;
+  cairo_text_extents(cr, text, &extents);
+  cairo_move_to(cr, offset.x, offset.y);
+  cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
+  cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  cairo_set_font_size(cr, settings.font_size);
+  cairo_show_text(cr, text);
+  return extents.x_advance;
+}
+
+/* @brief Draw an image at the given offset.
+ *
+ * @param cr A cairo context for drawing to the screen.
+ * @param file The image to be drawn.
+ * @return The advance in the x direction.
+ */
+static uint32_t draw_image(cairo_t *cr, const char *file, offset_t offset) {
+  wordexp_t expanded_file;
+  wordexp(file, &expanded_file, 0);
+
+  if (access((expanded_file.we_wordv)[0], F_OK) == -1) {
+    fprintf(stderr, "Cannot open image file %s\n", (expanded_file.we_wordv)[0]);
+    return 0;
+  }
+
+  cairo_surface_t *img;
+  img = cairo_image_surface_create_from_png((expanded_file.we_wordv)[0]);
+  int w = cairo_image_surface_get_width(img);
+  int h = cairo_image_surface_get_height(img);
+
+  /* Attempt to center the image if it is not the height of the line. */ 
+  int image_offset = (h - settings.height) / 2;
+  cairo_set_source_surface(cr, img, offset.x, offset.image_y - h + image_offset);
+  cairo_mask_surface(cr, img, offset.x, offset.image_y - h + image_offset);
+
+  return w;
+}
+
+/* @brief Parses the text pointed to by *c and moves *c to
+ *        a new location.
+ * @param[in/out] c A reference to the pointer to the current section
+ *                of text to parse.
+ * @return A populated draw_t type.
+ */
+static draw_t parse_response_line(char **c) {
+  if (!c || !*c) {
+    fprintf(stderr, "Invalid parse state");
+    return (draw_t){ DRAW_TEXT, NULL }; /* This will invoke a segfault most likely. */
+  }
+
+  char *data = NULL;
+  draw_type_t type = DRAW_TEXT;
+
+  /* We've found a sequence of some kind. */
+  if (**c == '\%') {
+    switch (*(*c+1)) {
+      case 'I':
+        *c += 1;
+        data = *c+1;
+        type = DRAW_IMAGE;
+        break;
+      default:
+        *c += 1;
+        data = *c;
+        break;
+    }
+  } else {
+    /* Escape character. */
+    if (**c == '\\' && *(*c + 1) == '\%') {
+      /* Skip the \ in the output. */
+      data = *c + 1;
+      /* Skip the check for %. */
+      *c += 2;
+    } else {
+      data = *c;
+    }
+    type = DRAW_TEXT;
+  }
+
+  while (**c != '\0' && **c != '\%' && **c != '\\') {
+    *c += 1;
+  }
+
+  return (draw_t){ type, data };
+}
+
 /* @brief Draw a line of text to a cairo context.
  *
  * @param cr A cairo context for drawing to the screen.
@@ -259,14 +367,25 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
   cairo_rectangle(cr, 0, line * settings.height + 2, settings.width, settings.height);
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
-  cairo_text_extents_t extents;
-  cairo_text_extents(cr, text, &extents);
   offset_t offset = calculate_line_offset(line);
-  cairo_move_to(cr, offset.x, offset.y);
-  cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
-  cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size(cr, settings.font_size);
-  cairo_show_text(cr, text);
+
+  /* Parse the response line as we draw it. */
+  char *c = (char *)text;
+  while (*c != '\0') {
+    draw_t d = parse_response_line(&c);
+    char saved = *c;
+    *c = '\0';
+    switch (d.type) {
+      case DRAW_IMAGE:
+        offset.x += draw_image(cr, d.data, offset);
+        break;
+      case DRAW_TEXT:
+      default:
+        offset.x += draw_text(cr, d.data, offset, foreground);
+        break;
+    }
+    *c = saved;
+  }
 
   pthread_mutex_unlock(&global.draw_mutex);
 }
