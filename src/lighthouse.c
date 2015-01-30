@@ -236,14 +236,21 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
   text[cursor] = '\0';
   cairo_text_extents(cr, text, &extents);
   text[cursor] = saved_char;
-  uint32_t cursor_x = extents.x_advance;
+  int32_t cursor_x = extents.x_advance;
 
   /* Find the text offset. */
   cairo_text_extents(cr, text, &extents);
   if (settings.width < extents.width) {
-    offset.x = settings.width - extents.x_advance - offset.x;
+    offset.x = settings.width - extents.x_advance;
   }
+
   cursor_x += offset.x;
+
+  /* if the cursor would be off the back end, set its position to 0 and scroll text instead */
+  if(cursor_x < 0) {
+      offset.x -= (cursor_x-3);
+      cursor_x = 0;
+  }
 
   /* Draw the text. */
   cairo_move_to(cr, offset.x, offset.y);
@@ -253,7 +260,7 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
   /* Draw the cursor. */
   uint32_t cursor_y = offset.y - settings.font_size - settings.cursor_padding;
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
-  cairo_rectangle(cr, cursor_x + 4, cursor_y, 0, settings.font_size + (settings.cursor_padding * 2));
+  cairo_rectangle(cr, cursor_x + 2, cursor_y, 0, settings.font_size + (settings.cursor_padding * 2));
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
 
