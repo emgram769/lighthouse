@@ -910,7 +910,7 @@ static void initialize_settings(char *config_file) {
   settings.width = WIDTH;
   settings.x = HALF_PERCENT;
   settings.y = HALF_PERCENT;
-  settings.desktop = 0;
+  settings.desktop = 0xFFFFFFFF;
   settings.screen = 0;
   settings.backspace_exit = 1;
 
@@ -1096,12 +1096,7 @@ int main(int argc, char **argv) {
     XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, strlen(title), title);
   xcb_change_property(connection, XCB_PROP_MODE_REPLACE, window,
     XCB_ATOM_WM_CLASS, XCB_ATOM_STRING, 8, strlen(title), title);
-  values[0] = settings.screen_x + settings.x * settings.screen_width / 100 - settings.width / 2;
-  values[1] = settings.screen_y + settings.y * settings.screen_height / 100 - settings.height / 2;
-
-  /* Get window properties. */
-  xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
-
+  
   /* Find the visualtype by iterating through depths. */
   xcb_visualtype_t *visual = NULL;
   xcb_depth_iterator_t depth_iter = xcb_screen_allowed_depths_iterator(screen);
@@ -1158,7 +1153,12 @@ int main(int argc, char **argv) {
 
   /* Now draw everything. */
   redraw_all(connection, window, cairo_context, cairo_surface, query_string, query_cursor_index);
-
+  
+  /* and center it */
+  values[0] = settings.screen_x + settings.x * settings.screen_width / 100 - settings.width / 2;
+  values[1] = settings.screen_y + settings.y * settings.screen_height / 100 - settings.height / 2;
+  xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
+  
   xcb_generic_event_t *event;
   while ((event = xcb_wait_for_event(connection))) {
     switch (event->response_type & ~0x80) {
@@ -1206,4 +1206,3 @@ cleanup:
   xcb_key_symbols_free(keysyms);
   return exit_code;
 }
-
