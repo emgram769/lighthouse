@@ -9,7 +9,7 @@ OBJS=$(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
 
 CFLAGS+=-O2 -Wall -std=c99
 CFLAGS_DEBUG+=-O0 -g3 -Werror -DDEBUG -pedantic
-LDFLAGS+=-lxcb -lxcb-xkb -lxcb-xinerama -lxcb-randr -lcairo -lpthread
+LDFLAGS+=-lxcb -lxkbcommon -lxcb-xkb -lxcb-xinerama -lxcb-randr -lcairo -lpthread
 
 all: lighthouse
 

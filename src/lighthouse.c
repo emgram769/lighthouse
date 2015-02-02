@@ -43,10 +43,16 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <getopt.h>
+#include <uchar.h>
+#include <wchar.h>
+#include <wctype.h>
 
 #include <xcb/xcb.h>
 #include <xcb/xinerama.h>
 #include <xcb/randr.h>
+#include <xkbcommon/xkbcommon.h>
+#include <xkbcommon/xkbcommon-x11.h>
+#include <xkbcommon/xkbcommon-compose.h>
 #include <cairo/cairo.h>
 #include <cairo/cairo-xcb.h>
 #include <pthread.h>
@@ -614,7 +620,7 @@ static inline int32_t process_key_stroke(char *query_buffer, uint32_t *query_ind
   int32_t redraw = 0;
   int32_t resend = 0;
 
-  debug("key: %u\n", key);
+  debug("key: %u, char: '%c', can print: %d\n", key, (char32_t)key, iswprint((wchar_t)key));
 
   switch (key) {
     case 65293: /* Enter. */
@@ -662,7 +668,7 @@ static inline int32_t process_key_stroke(char *query_buffer, uint32_t *query_ind
       }
       break;
     default:
-      if (isprint((char)key) && *query_index < MAX_QUERY) {
+      if (iswprint((wchar_t)key) && *query_index < MAX_QUERY) {
         memmove(&query_buffer[(*query_cursor_index) + 1], &query_buffer[*query_cursor_index], *query_index - *query_cursor_index + 1);
         query_buffer[(*query_cursor_index)++] = key;
         (*query_index)++;
@@ -1114,7 +1120,7 @@ int main(int argc, char **argv) {
   }
 
   /* Create cairo stuff. */
-  cairo_surface_t *cairo_surface = cairo_xcb_surface_create(connection, window,visual, settings.width, settings.height);
+  cairo_surface_t *cairo_surface = cairo_xcb_surface_create(connection, window, visual, settings.width, settings.height);
   if (cairo_surface == NULL) {
     goto cleanup;
   }
@@ -1160,6 +1166,22 @@ int main(int argc, char **argv) {
   xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
   
   xcb_generic_event_t *event;
+
+  const char *locale = getenv("LC_ALL");
+  if (!locale) {
+    locale = getenv("LC_CTYPE");
+  }
+  if (!locale) {
+    locale = getenv("LANG");
+  }
+  if (!locale) {
+    locale = "C";
+  }
+
+  struct xkb_context *xkb_ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+ 
+  struct xkb_compose_table *compose_table = xkb_compose_table_new_from_locale(xkb_ctx, locale, 0);
+
   while ((event = xcb_wait_for_event(connection))) {
     switch (event->response_type & ~0x80) {
       case XCB_EXPOSE: {
@@ -1173,16 +1195,22 @@ int main(int argc, char **argv) {
         break;
       }
       case XCB_KEY_PRESS: {
-        break;
-      }
-      case XCB_KEY_RELEASE: {
         xcb_key_release_event_t *k = (xcb_key_release_event_t *)event;
-        xcb_keysym_t key = xcb_key_press_lookup_keysym(keysyms, k, k->state & ~XCB_MOD_MASK_2);
+        debug("keycode: %u, sequence: %u, state: %u\n", k->detail, k->sequence, k->state);
+        struct xkb_compose_state *ks = xkb_compose_state_new(compose_table, 0);
+        xkb_keysym_t kk = xkb_compose_state_get_one_sym(ks);
+        printf("%d\n", kk);
+        xcb_keysym_t key = xcb_key_press_lookup_keysym(keysyms, k, k->state & ~XCB_MOD_MASK_1);
         int32_t ret = process_key_stroke(query_string, &query_index, &query_cursor_index, key, connection, cairo_context, cairo_surface, to_child);
         if (ret <= 0) {
           exit_code = ret;
           goto cleanup;
         }
+        break;
+      }
+      case XCB_KEY_RELEASE: {
+        //xcb_key_release_event_t *k = (xcb_key_release_event_t *)event;
+        //debug("keycode: %u, sequence: %u, state: %u\n", k->detail, k->sequence, k->state);
         break;
       }
       case XCB_EVENT_MASK_BUTTON_PRESS: {
