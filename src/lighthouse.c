@@ -68,7 +68,7 @@
 #define MAX_RESULT_SIZE   10*1024
 
 /* @brief Name of the file to search for. */
-#define CONFIG_FILE       "./.config/lighthouse/lighthouserc"
+#define CONFIG_FILE       "~/.config/lighthouse/lighthouserc"
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
@@ -294,14 +294,15 @@ static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_
 static uint32_t draw_image(cairo_t *cr, const char *file, offset_t offset) {
   wordexp_t expanded_file;
   wordexp(file, &expanded_file, 0);
+  file = expanded_file.we_wordv[0];
 
-  if (access((expanded_file.we_wordv)[0], F_OK) == -1) {
-    fprintf(stderr, "Cannot open image file %s\n", (expanded_file.we_wordv)[0]);
+  if (access(file, F_OK) == -1) {
+    fprintf(stderr, "Cannot open image file %s\n", file);
     return 0;
   }
 
   cairo_surface_t *img;
-  img = cairo_image_surface_create_from_png((expanded_file.we_wordv)[0]);
+  img = cairo_image_surface_create_from_png(file);
   int w = cairo_image_surface_get_width(img);
   int h = cairo_image_surface_get_height(img);
 
@@ -723,8 +724,9 @@ static int32_t spawn_piped_process(char *file, int32_t *to_child_fd, int32_t *fr
 
     wordexp_t expanded_file;
     wordexp(file, &expanded_file, 0);
+    file = expanded_file.we_wordv[0];
 
-    execlp((expanded_file.we_wordv)[0], (expanded_file.we_wordv)[0], NULL);
+    execlp(file, file, NULL);
     fprintf(stderr, "Couldn't execute file.\n");
     close(out_pipe[1]);
     close(in_pipe[0]);
@@ -915,10 +917,9 @@ static void initialize_settings(char *config_file) {
   settings.backspace_exit = 1;
 
   /* Read in from the config file. */
-  if (chdir(getenv("HOME"))) {
-    fprintf(stderr, "Unable to access the HOME directory.\n");
-    exit(1);
-  }
+  wordexp_t expanded_file;
+  wordexp(config_file, &expanded_file, 0);
+  config_file = expanded_file.we_wordv[0];
 
   size_t ret = 0;
   if (access(config_file, F_OK) != -1) {
