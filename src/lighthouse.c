@@ -55,7 +55,7 @@
 
 /** @brief Defaults for settings. */
 #define HEIGHT            30
-#define MAX_HEIGHT        800
+#define MAX_HEIGHT        7 * HEIGHT
 #define WIDTH             500
 #define FONT_SIZE         18
 #define HALF_PERCENT      50
@@ -64,8 +64,8 @@
 #define CURSOR_PADDING    4
 
 /* @brief Size of the buffers. */
-#define MAX_CONFIG_SIZE   10*1024
-#define MAX_RESULT_SIZE   10*1024
+#define MAX_CONFIG_SIZE   10 * 1024
+#define MAX_RESULT_SIZE   10 * 1024
 
 /* @brief Name of the file to search for. */
 #define CONFIG_FILE       "~/.config/lighthouse/lighthouserc"
@@ -128,6 +128,7 @@ static struct {
   char config_buf[MAX_CONFIG_SIZE];
   uint32_t result_count;
   uint32_t result_highlight;
+  uint32_t result_offset;
   int32_t child_pid;
   pthread_t results_thr;
 } global;
@@ -437,15 +438,24 @@ static void draw_response_text(xcb_connection_t *connection, xcb_window_t window
     cairo_xcb_surface_set_size(surface, settings.width, new_height);
   }
 
-  int32_t i;
+  int32_t line, index;
   if (global.result_count - 1 < global.result_highlight) {
     global.result_highlight = global.result_count - 1;
   }
-  for (i = 0; i < result_count; i++) {
-    if (i != global.result_highlight) {
-      draw_line(cr, results[i].text, i + 1, &settings.result_fg, &settings.result_bg);
+
+  uint32_t max_results = settings.max_height / settings.height;
+  uint32_t display_results = min(result_count, max_results);
+  if ((global.result_offset + display_results) <= global.result_highlight + 1) {
+    global.result_offset = global.result_highlight - display_results + 2;
+  } else if (global.result_offset > global.result_highlight) {
+    global.result_offset = global.result_highlight;
+  }
+
+  for (index = global.result_offset, line = 1; index < global.result_offset + display_results; index++, line++) {
+    if (index != global.result_highlight) {
+      draw_line(cr, results[index].text, line, &settings.result_fg, &settings.result_bg);
     } else {
-      draw_line(cr, results[i].text, i + 1, &settings.highlight_fg, &settings.highlight_bg);
+      draw_line(cr, results[index].text, line, &settings.highlight_fg, &settings.highlight_bg);
     }
   }
   cairo_surface_flush(surface);
@@ -536,6 +546,29 @@ static uint32_t parse_response_text(char *text, size_t length, result_t **result
   return count;
 }
 
+/* @brief Checks if the buffer has a newline.
+ *
+ * If there is a newline it is replaced with a null terminator
+ * and 1 is returned, otherwise 0 is returned.
+ *
+ * @param buf The buffer to be scanned for a newline.
+ * @param len The length of the buffer.
+ * @return 1 if there exists a newline in the buffer, else 0.
+ */
+int32_t find_newline(char *buf, size_t len) {
+  uint32_t i;
+  for (i = 0; i < len; i++) {
+    if (buf[i] == '\n') {
+      buf[i] = '\0';
+      return 1;
+    }
+    if (buf[i] == '\0') {
+      return 0;
+    }
+  }
+  return 0;
+}
+
 /* @brief Reads from the child process's standard out in a loop.  Meant to be used
  *        as a spawned thread.
  *
@@ -553,8 +586,13 @@ void *get_results(void *args) {
   size_t res;
 
   while (1) {
-    res = read(fd, global.result_buf, sizeof(global.result_buf));
-    global.result_buf[res] = '\0';
+    /* Read until a new line. */
+    res = 0;
+    do {
+      res += read(fd, global.result_buf + res, sizeof(global.result_buf) - res);
+    } while(!find_newline(global.result_buf, sizeof(global.result_buf))
+            && res > 0);
+
     if (res < 0) {
       fprintf(stderr, "Error in spawned cmd.\n");
       return NULL;
@@ -568,6 +606,7 @@ void *get_results(void *args) {
     }
     global.results = results;
     global.result_count = result_count;
+    debug("Recieved %d results.\n", result_count);
     draw_response_text(connection, window, cairo_context, cairo_surface, results, result_count);
   }
 }
@@ -643,7 +682,7 @@ static inline int32_t process_key_stroke(char *query_buffer, uint32_t *query_ind
       }
       break;
     case 65364: /* Down. */
-      if (global.result_highlight < global.result_count-1) {
+      if (global.result_count && global.result_highlight < global.result_count-1) {
         global.result_highlight++;
         draw_response_text(connection, 0, cairo_context, cairo_surface, global.results, global.result_count);
       }
@@ -768,6 +807,8 @@ static void set_setting(char *param, char *val) {
     sscanf(val, "%u", &settings.x);
   } else if (!strcmp("y", param)) {
     sscanf(val, "%u", &settings.y);
+  } else if (!strcmp("max_height", param)) {
+    sscanf(val, "%u", &settings.max_height);
   } else if (!strcmp("screen", param)) {
     sscanf(val, "%u", &settings.screen);
   } else if (!strcmp("backspace_exit", param)) {
