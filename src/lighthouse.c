@@ -384,7 +384,7 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
 
   /* Parse the response line as we draw it. */
   char *c = (char *)text;
-  while (*c != '\0') {
+  while (c && *c != '\0') {
     draw_t d = parse_response_line(&c);
     char saved = *c;
     *c = '\0';
@@ -443,10 +443,11 @@ static void draw_response_text(xcb_connection_t *connection, xcb_window_t window
     global.result_highlight = global.result_count - 1;
   }
 
-  uint32_t max_results = settings.max_height / settings.height;
+  uint32_t max_results = settings.max_height / settings.height - 1;
   uint32_t display_results = min(result_count, max_results);
-  if ((global.result_offset + display_results) <= global.result_highlight + 1) {
-    global.result_offset = global.result_highlight - display_results + 2;
+  if ((global.result_offset + display_results) < (global.result_highlight + 1)) {
+    global.result_offset = global.result_highlight - (display_results - 1);
+    display_results = global.result_count - global.result_offset;
   } else if (global.result_offset > global.result_highlight) {
     global.result_offset = global.result_highlight;
   }
@@ -498,7 +499,7 @@ static uint32_t parse_response_text(char *text, size_t length, result_t **result
         case '{':
         case '|':
         case '}':
-          memmove(&text[index], &text[index+1], length - index);
+          memmove(&text[index], &(text[index+1]), length - index);
           break;
         default:
           break;
@@ -514,7 +515,7 @@ static uint32_t parse_response_text(char *text, size_t length, result_t **result
       count++;
       ret = realloc(ret, count * sizeof(result_t));
       if (index + 1 < length) {
-        ret[count - 1].text = &text[index+1];
+        ret[count - 1].text = &(text[index+1]);
       }
       mode++;
     }
@@ -527,7 +528,7 @@ static uint32_t parse_response_text(char *text, size_t length, result_t **result
       }
       text[index] = 0;
       if (index + 1 < length) {
-        ret[count - 1].action = &text[index+1];
+        ret[count - 1].action = &(text[index+1]);
       }
       mode++;
     }
@@ -601,11 +602,13 @@ void *get_results(void *args) {
     }
     result_t *results = NULL;
     uint32_t result_count = parse_response_text(global.result_buf, res, &results);
+    pthread_mutex_lock(&global.result_mutex);
     if (global.results && results != global.results) {
       free(global.results);
     }
     global.results = results;
     global.result_count = result_count;
+    pthread_mutex_unlock(&global.result_mutex);
     debug("Recieved %d results.\n", result_count);
     draw_response_text(connection, window, cairo_context, cairo_surface, results, result_count);
   }
@@ -650,6 +653,8 @@ static int32_t write_to_remote(FILE *child, char *format, ...) {
  * @return 0 on success and 1 on failure.
  */
 static inline int32_t process_key_stroke(char *query_buffer, uint32_t *query_index, uint32_t *query_cursor_index, xcb_keysym_t key, xcb_connection_t *connection, cairo_t *cairo_context, cairo_surface_t *cairo_surface, FILE *to_write) {
+  pthread_mutex_lock(&global.result_mutex);
+
   /* Check when we should update. */
   int32_t redraw = 0;
   int32_t resend = 0;
@@ -682,13 +687,13 @@ static inline int32_t process_key_stroke(char *query_buffer, uint32_t *query_ind
       }
       break;
     case 65364: /* Down. */
-      if (global.result_count && global.result_highlight < global.result_count-1) {
+      if (global.result_count && global.result_highlight < global.result_count - 1) {
         global.result_highlight++;
         draw_response_text(connection, 0, cairo_context, cairo_surface, global.results, global.result_count);
       }
       break;
     case 65307: /* Escape. */
-      return 0;
+      goto cleanup;
     case 65288: /* Backspace. */
       if (*query_index > 0 && *query_cursor_index > 0) {
         memmove(&query_buffer[(*query_cursor_index) - 1], &query_buffer[*query_cursor_index], *query_index - *query_cursor_index + 1);
@@ -698,7 +703,7 @@ static inline int32_t process_key_stroke(char *query_buffer, uint32_t *query_ind
         redraw = 1;
         resend = 1;
       } else if (*query_index == 0 && settings.backspace_exit) { /* Backspace with nothing? */
-        return 0;
+        goto cleanup;
       }
       break;
     default:
@@ -723,7 +728,12 @@ static inline int32_t process_key_stroke(char *query_buffer, uint32_t *query_ind
     }
   }
 
+  pthread_mutex_unlock(&global.result_mutex);
   return 1;
+
+cleanup:
+  pthread_mutex_unlock(&global.result_mutex);
+  return 0;
 }
 
 /* @brief Spawns a process (via fork) and sets up pipes to allow communication with
@@ -1169,6 +1179,11 @@ int main(int argc, char **argv) {
 
   /* Spawn a thread to listen to our remote process. */
   if (pthread_mutex_init(&global.draw_mutex, NULL)) {
+    fprintf(stderr, "Failed to create mutex.");
+    goto cleanup;
+  }
+  
+  if (pthread_mutex_init(&global.result_mutex, NULL)) {
     fprintf(stderr, "Failed to create mutex.");
     goto cleanup;
   }
