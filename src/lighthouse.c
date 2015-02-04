@@ -294,8 +294,11 @@ static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_
  */
 static uint32_t draw_image(cairo_t *cr, const char *file, offset_t offset) {
   wordexp_t expanded_file;
-  wordexp(file, &expanded_file, 0);
-  file = expanded_file.we_wordv[0];
+  if (wordexp(file, &expanded_file, 0)) {
+    fprintf(stderr, "Error expanding file %s\n", file);
+  } else {
+    file = expanded_file.we_wordv[0];
+  }
 
   if (access(file, F_OK) == -1) {
     fprintf(stderr, "Cannot open image file %s\n", file);
@@ -356,7 +359,8 @@ static draw_t parse_response_line(char **c) {
     type = DRAW_TEXT;
   }
 
-  while (**c != '\0' && **c != '%' && **c != '\\') {
+  while (**c != '\0' && **c != '%'
+         && !(**c == '\\' && *(*c + 1) == '%')) {
     *c += 1;
   }
 
@@ -665,7 +669,7 @@ static inline int32_t process_key_stroke(char *query_buffer, uint32_t *query_ind
     case 65293: /* Enter. */
       if (global.results && global.result_highlight < global.result_count && global.result_highlight >= 0) {
         printf("%s", global.results[global.result_highlight].action);
-        return 0;
+        goto cleanup;
       }
       break;
     case 65361: /* Left. */
@@ -772,8 +776,11 @@ static int32_t spawn_piped_process(char *file, int32_t *to_child_fd, int32_t *fr
     dup2(out_pipe[1], STDOUT_FILENO);
 
     wordexp_t expanded_file;
-    wordexp(file, &expanded_file, 0);
-    file = expanded_file.we_wordv[0];
+    if (wordexp(file, &expanded_file, 0)) {
+      fprintf(stderr, "Error expanding file %s\n", file);
+    } else {
+      file = expanded_file.we_wordv[0];
+    }
 
     execlp(file, file, NULL);
     fprintf(stderr, "Couldn't execute file.\n");
@@ -969,8 +976,11 @@ static void initialize_settings(char *config_file) {
 
   /* Read in from the config file. */
   wordexp_t expanded_file;
-  wordexp(config_file, &expanded_file, 0);
-  config_file = expanded_file.we_wordv[0];
+  if (wordexp(config_file, &expanded_file, 0)) {
+    fprintf(stderr, "Error expanding file %s\n", config_file);
+  } else {
+    config_file = expanded_file.we_wordv[0];
+  }
 
   size_t ret = 0;
   if (access(config_file, F_OK) != -1) {
