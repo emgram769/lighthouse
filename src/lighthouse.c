@@ -593,10 +593,12 @@ void *get_results(void *args) {
   while (1) {
     /* Read until a new line. */
     res = 0;
+    int ret;
     do {
-      res += read(fd, global.result_buf + res, sizeof(global.result_buf) - res);
+      ret = read(fd, global.result_buf + res, sizeof(global.result_buf) - res);
+      res += ret;
     } while(!find_newline(global.result_buf, sizeof(global.result_buf))
-            && res > 0);
+            && ret > 0);
 
     if (res < 0) {
       fprintf(stderr, "Error in spawned cmd.\n");
