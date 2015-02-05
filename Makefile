@@ -14,7 +14,7 @@ LDFLAGS+=-lxcb -lxcb-xkb -lxcb-xinerama -lxcb-randr -lcairo -lpthread
 all: lighthouse
 
 debug: CC+=$(CFLAGS_DEBUG)
-debug: lighthouse
+debug: lighthouse .FORCE
 
 config: lighthouse .FORCE
 	cp -ir config/* ~/.config/

@@ -1024,7 +1024,7 @@ static void initialize_settings(char *config_file) {
  * @return Void.
  */
 void kill_zombie(void) {
-  kill(global.child_pid, SIGKILL);
+  kill(global.child_pid, SIGTERM);
   while(wait(NULL) == -1);
 }
 
