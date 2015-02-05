@@ -96,6 +96,8 @@ Run `lighthouse` in your terminal and look at the output.  If the script crahes 
 standard error, and if it succeeds you'll see what lighthouse is outputting.  Check out
 `config/lighthouse/cmd.py` for an example of how more complicated scripts should work.
 
+Note that any files being used by lighthouse, including images in the results, the command file and optional configuration files must escape certain characters: ` |, &, ;, <, >, (, ), {, }`.
+
 Options
 ---
 The `-c` command line flag will allow you to set a custom location for the configurations file.
