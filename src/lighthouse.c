@@ -50,6 +50,7 @@
 #include <cairo/cairo.h>
 #include <cairo/cairo-xcb.h>
 #include <pthread.h>
+#include <errno.h>
 
 #include <xcb_keysyms.h>  /* xcb_key_symbols_alloc, xcb_key_press_lookup_keysym */
 
@@ -112,11 +113,11 @@ typedef struct {
 
 /* @brief This struct is exclusively used to spawn a thread. */
 struct result_params {
-  int32_t fd;
   cairo_t *cr;
   cairo_surface_t *cr_surface;
   xcb_connection_t *connection;
   xcb_window_t window;
+  int32_t fd;
 };
 
 /* @brief A struct of globals that are used throughout the program. */
@@ -517,7 +518,7 @@ static uint32_t parse_response_text(char *text, size_t length, result_t **result
         return 0;
       }
       count++;
-      ret = realloc(ret, count * sizeof(result_t));
+      ret = realloc(ret, count * sizeof(ret[0]));
       if (index + 1 < length) {
         ret[count - 1].text = &(text[index+1]);
       }
@@ -757,18 +758,18 @@ static int32_t spawn_piped_process(char *file, int32_t *to_child_fd, int32_t *fr
   pid_t child_pid;
 
   if (pipe(in_pipe)) {
-    fprintf(stderr, "Couldn't create pipe 1.\n");
+    fprintf(stderr, "Couldn't create pipe 1: %s\n", strerror(errno));
     return -1;
   }
 
   if (pipe(out_pipe)) {
-    fprintf(stderr, "Couldn't create pipe 2.\n");
+    fprintf(stderr, "Couldn't create pipe 2: %s\n", strerror(errno));
     return -1;
   }
 
   /* Execute the user process. */
   if ((child_pid = fork()) == -1) {
-    fprintf(stderr, "Couldn't spawn cmd.\n");
+    fprintf(stderr, "Couldn't spawn cmd: %s\n", strerror(errno));
     return -1;
   }
 
@@ -785,7 +786,7 @@ static int32_t spawn_piped_process(char *file, int32_t *to_child_fd, int32_t *fr
     }
 
     execlp(file, file, NULL);
-    fprintf(stderr, "Couldn't execute file.\n");
+    fprintf(stderr, "Couldn't execute file: %s\n", strerror(errno));
     close(out_pipe[1]);
     close(in_pipe[0]);
     return -1;
@@ -953,7 +954,7 @@ xinerama:
  *
  * @return Void.
  */
-static void initialize_settings(char *config_file) {
+static int initialize_settings(char *config_file) {
   /* Set default settings. */
   settings.query_fg.r = settings.highlight_fg.r = 0.1;
   settings.query_fg.g = settings.highlight_fg.g = 0.1;
@@ -985,12 +986,14 @@ static void initialize_settings(char *config_file) {
   }
 
   size_t ret = 0;
-  if (access(config_file, F_OK) != -1) {
-    int32_t fd = open(config_file, O_RDONLY);
-    ret = read(fd, global.config_buf, sizeof(global.config_buf));
+  int32_t fd = open(config_file, O_RDONLY);
+  if (fd == -1) {
+    fprintf(stderr, "Couldn't open config file %s: %s\n", config_file, strerror(errno));
+    return 1;
   } else {
-    fprintf(stderr, "Couldn't open config file %s.\n", config_file);
+    ret = read(fd, global.config_buf, sizeof(global.config_buf));
   }
+
   int32_t i, mode;
   mode = 1; /* 0 looking for param. 1 looking for value. 2 skipping chars */
   char *curr_param = global.config_buf;
@@ -1016,6 +1019,7 @@ static void initialize_settings(char *config_file) {
         break;
     }
   }
+  return 0;
 }
 
 /* @brief A function called at the end of execution to clean up
@@ -1048,7 +1052,9 @@ int main(int argc, char **argv) {
     }
   }
 
-  initialize_settings(config_file);
+  if (initialize_settings(config_file)) {
+    return 1;
+  }
 
   /* Set up the remote process. */
   int32_t to_child_fd, from_child_fd;
@@ -1208,7 +1214,7 @@ int main(int argc, char **argv) {
   results_thr_params.window = window;
 
   if (pthread_create(&global.results_thr, NULL, &get_results, &results_thr_params)) {
-    fprintf(stderr, "Couldn't spawn second thread.\n");
+    fprintf(stderr, "Couldn't spawn second thread: %s\n", strerror(errno));
     exit(1);
   }
 
