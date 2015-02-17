@@ -49,7 +49,8 @@ Ubuntu:
     libx11-xcb-dev
     libcairo2-dev
     libxcb-xkb-dev
-    libxcb-xineram0-dev
+	libxcb-xinerama0-dev
+	libxcb-randr0-dev
 
 NixOS:
 
