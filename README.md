@@ -104,8 +104,26 @@ Options
 The `-c` command line flag will allow you to set a custom location for the configurations file.
 An example would be `lighthouse -c ~/lighthouserc2`.
 
+Configuration file
+---
 Check out the sample `lighthouserc` in `config/lighthouse`.  Copy it to your directory by
 running `make config`.
+
+List of settings you can set in the configuration file:
+- `font_name`
+- `font_size`
+- `horiz_padding`
+- `cursor_padding`
+- `height`
+- `width`
+- `x`
+- `y`
+- `max_height`
+- `screen`
+- `desktop`
+- `backspace_exit`
+- `cmd`
+- `query_fg`, `query_bg`, `result_fg`, `result_bg`, `hightlight_fg`, `highlight_bg`
 
 TODO
 ---
