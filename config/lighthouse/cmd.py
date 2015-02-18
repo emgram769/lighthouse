@@ -62,7 +62,10 @@ def google(query):
 find_thr = None
 def find(query):
   sleep(.5) # Don't be too aggressive...
-  find_out = str(subprocess.check_output(["find", "~", "-name", query]))
+  try:
+    find_out = str(subprocess.check_output(["find", "~", "-name", query]))
+  except subprocess.CalledProcessError as e:
+    find_out = str(e.output)
   find_array = find_out.split("\n")[:-1]
   if (len(find_array) == 0): return
   for i in xrange(min(5, len(find_array))):
