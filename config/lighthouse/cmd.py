@@ -142,64 +142,74 @@ def get_xdg_cmd(cmd):
 
 
 special = {
-  "chrom": (lambda x: ("did you mean firefox?","firefox")),
-  "fir": (lambda x: ("%I~/.config/lighthouse/firefox.png%firefox","firefox")),
-  "gim": (lambda x: ("%I~/.config/lighthouse/gimp.png%GIMP", "gimp")),
-  "vi": (lambda x: ("vim","urxvt -e vim")),
-  "bat": (lambda x: get_process_output("acpi", "%s", ""))
-};
+    "bat": (lambda x: get_process_output("acpi", "%s", "")),
+    "vi": (lambda x: ("vim","urxvt -e vim")),
+}
 
 while 1:
-  userInput = sys.stdin.readline()
-  userInput = userInput[:-1]
+    userInput = sys.stdin.readline()
+    userInput = userInput[:-1]
 
-  # Clear results
-  clear_output()
+    # Clear results
+    clear_output()
 
-  # Kill previous worker threads
-  if google_thr != None:
-    google_thr.terminate()
-  if find_thr != None:
-    find_thr.terminate()
+    # Kill previous worker threads
+    if google_thr is not None:
+        google_thr.terminate()
+    if find_thr is not None:
+        find_thr.terminate()
 
-  # We don't handle empty strings
-  if userInput == '':
-    update_output()
-    continue
+    # We don't handle empty strings
+    if userInput == '':
+        update_output()
+        continue
 
-  # Could be a command...
-  append_output("execute '"+userInput+"'", userInput);
+    try:
+        complete = subprocess.check_output("compgen -c %s" % (userInput),
+                                               shell=True)
+        complete = complete.split('\n')
 
-  # Could be bash...
-  append_output("run '"+userInput+"' in a shell", "urxvt -e bash -c '"+userInput+" && bash'");
+        for cmd_num in range(min(len(complete), 5)):
+                # Look for XDG applications of the given name.
+                xdg_cmd = get_xdg_cmd(complete[cmd_num])
+                if xdg_cmd:
+                    append_output(*xdg_cmd)
 
-  # Scan for keywords
-  for keyword in special:
-    if userInput[0:len(keyword)] == keyword:
-      out = special[keyword](userInput)
-      if out != None:
-        prepend_output(*out);
+    except:
+        # if no command exist with the user input
+        # but it can still be python or a special bash command
+        pass
 
-  # Look for XDG applications of the given name.
-  xdg_cmd = get_xdg_cmd(userInput)
-  if xdg_cmd:
-    append_output(*xdg_cmd)
+    finally:
+        # Scan for keywords
+        for keyword in special:
+            if userInput[0:len(keyword)] == keyword:
+                out = special[keyword](userInput)
+                if out is not None:
+                    prepend_output(*out)
 
-  # Is this python?
-  try:
-    out = eval(userInput)
-    if (type(out) != str and str(out)[0] == '<'):
-      pass # We don't want gibberish type stuff
-    else:
-      prepend_output("python: "+str(out), "urxvt -e python2.7 -i -c 'print "+userInput+"'")
-  except Exception as e:
-    pass
+        # Could be a command...
+        append_output("execute '"+userInput+"'", userInput)
 
-  # Spawn worker threads
-  google_thr = Process(target=google, args=(userInput,))
-  google_thr.start()
-  find_thr = Process(target=find, args=(userInput,))
-  find_thr.start()
- 
-  update_output()
-  
+        # Could be bash...
+        append_output("run '%s' in a shell" % (userInput),
+                      "terminator -e %s" % (userInput))
+
+        # Is this python?
+        try:
+            out = eval(userInput)
+            if (type(out) != str and str(out)[0] == '<'):
+                pass  # We don't want gibberish type stuff
+            else:
+                prepend_output("python: "+str(out),
+                            "terminator -e python2.7 -i -c 'print "+userInput+"'")
+        except Exception as e:
+            pass
+
+        # Spawn worker threads
+        google_thr = Process(target=google, args=(userInput,))
+        google_thr.start()
+        find_thr = Process(target=find, args=(userInput,))
+        find_thr.start()
+
+        update_output()
