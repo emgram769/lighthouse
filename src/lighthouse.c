@@ -1109,7 +1109,7 @@ int main(int argc, char **argv) {
     window_type_atom = atom_reply->atom;
     free(atom_reply);
 
-    atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_WINDOW_TYPE_DOCK"), "_NET_WM_WINDOW_TYPE_DOCK");
+    atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_WINDOW_TYPE_DIALOG"), "_NET_WM_WINDOW_TYPE_DIALOG");
     atom_reply = xcb_intern_atom_reply(connection, atom_cookie, NULL);
     if (atom_reply) {
       window_type_dock_atom = atom_reply->atom;
