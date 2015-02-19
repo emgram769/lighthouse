@@ -193,7 +193,7 @@ while 1:
 
         # Could be bash...
         append_output("run '%s' in a shell" % (userInput),
-                      "terminator -e %s" % (userInput))
+                      "urxvt -e %s" % (userInput))
 
         # Is this python?
         try:
@@ -202,7 +202,7 @@ while 1:
                 pass  # We don't want gibberish type stuff
             else:
                 prepend_output("python: "+str(out),
-                            "terminator -e python2.7 -i -c 'print "+userInput+"'")
+                               "urxvt -e python2.7 -i -c 'print "+userInput+"'")
         except Exception as e:
             pass
 
