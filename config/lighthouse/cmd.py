@@ -9,6 +9,7 @@ from multiprocessing import Process, Value, Manager, Array
 from ctypes import c_char, c_char_p
 import subprocess
 import json
+import os
 
 MAX_OUTPUT = 100 * 1024
 
@@ -63,7 +64,7 @@ find_thr = None
 def find(query):
   sleep(.5) # Don't be too aggressive...
   try:
-    find_out = str(subprocess.check_output(["find", "~", "-name", query]))
+    find_out = str(subprocess.check_output(["find", os.path.expanduser("~"), "-name", query]))
   except subprocess.CalledProcessError as e:
     find_out = str(e.output)
   find_array = find_out.split("\n")[:-1]
@@ -193,7 +194,7 @@ while 1:
 
         # Could be bash...
         append_output("run '%s' in a shell" % (userInput),
-                      "urxvt -e %s" % (userInput))
+                      "terminator -e %s" % (userInput))
 
         # Is this python?
         try:
@@ -202,7 +203,7 @@ while 1:
                 pass  # We don't want gibberish type stuff
             else:
                 prepend_output("python: "+str(out),
-                               "urxvt -e python2.7 -i -c 'print "+userInput+"'")
+                            "terminator -e python2.7 -i -c 'print "+userInput+"'")
         except Exception as e:
             pass
 
