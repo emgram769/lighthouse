@@ -167,7 +167,7 @@ while 1:
 
     try:
         complete = subprocess.check_output("compgen -c %s" % (userInput),
-                                               shell=True)
+                                               shell=True, executable="/bin/bash")
         complete = complete.split('\n')
 
         for cmd_num in range(min(len(complete), 5)):
