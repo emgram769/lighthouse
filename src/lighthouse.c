@@ -287,6 +287,26 @@ static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_
   return extents.x_advance;
 }
 
+cairo_surface_t * scale_surface (cairo_surface_t *surface, int width, int height,
+        int new_width, int new_height) {
+    cairo_surface_t *new_surface = cairo_surface_create_similar(surface,
+            CAIRO_CONTENT_COLOR_ALPHA, new_width, new_height);
+    cairo_t *cr = cairo_create (new_surface);
+
+    cairo_scale (cr, (double)new_width / width, (double)new_height / height);
+    cairo_set_source_surface (cr, surface, 0, 0);
+
+    cairo_pattern_set_extend (cairo_get_source(cr), CAIRO_EXTEND_REFLECT);
+
+    cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
+
+    cairo_paint (cr);
+
+    cairo_destroy (cr);
+
+    return new_surface;
+}
+
 /* @brief Draw an image at the given offset.
  *
  * @param cr A cairo context for drawing to the screen.
@@ -310,7 +330,9 @@ static uint32_t draw_image(cairo_t *cr, const char *file, offset_t offset) {
   img = cairo_image_surface_create_from_png(file);
   int w = cairo_image_surface_get_width(img);
   int h = cairo_image_surface_get_height(img);
-
+  img = scale_surface (img, w, h, settings.height, settings.height);
+  h = settings.height;
+  w = settings.height;
   /* Attempt to center the image if it is not the height of the line. */ 
   int image_offset = (h - settings.height) / 2;
   cairo_set_source_surface(cr, img, offset.x, offset.image_y - h + image_offset);
@@ -395,7 +417,7 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
     *c = '\0';
     switch (d.type) {
       case DRAW_IMAGE:
-        offset.x += draw_image(cr, d.data, offset);
+        offset.x += draw_image(cr, d.data, offset) + settings.height / 10;
         break;
       case DRAW_TEXT:
       default:
