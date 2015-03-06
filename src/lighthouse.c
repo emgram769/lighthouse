@@ -721,6 +721,15 @@ static inline int32_t process_key_stroke(char *query_buffer, uint32_t *query_ind
         draw_response_text(connection, 0, cairo_context, cairo_surface, global.results, global.result_count);
       }
       break;
+    case 65289: /* Tab. */
+      if (global.result_count && global.result_highlight < global.result_count - 1) {
+        global.result_highlight++;
+        draw_response_text(connection, 0, cairo_context, cairo_surface, global.results, global.result_count);
+      } else if(global.result_count && global.result_highlight == global.result_count - 1) {
+        global.result_highlight = 0;
+        draw_response_text(connection, 0, cairo_context, cairo_surface, global.results, global.result_count);
+      }
+      break;
     case 65307: /* Escape. */
       goto cleanup;
     case 65288: /* Backspace. */
