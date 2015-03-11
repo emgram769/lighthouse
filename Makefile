@@ -18,6 +18,7 @@ debug: lighthouse .FORCE
 
 config: lighthouse .FORCE
 	cp -ir config/* ~/.config/
+	chmod +x ~/.config/lighthouse/cmd*
 
 .FORCE:
 
