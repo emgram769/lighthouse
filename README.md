@@ -84,6 +84,7 @@ To create multiple results simply chain them together: `{ title1 | action1 }{ ti
 
 There is also image support in the form `{ %Ifile.png% <- an image! | feh file.png }`.
 To use `%` as a character, escape it with `\%`.
+Currently only PNG images are supported.
 
 Other ways to use lighthouse
 ---
