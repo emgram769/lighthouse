@@ -330,9 +330,10 @@ static uint32_t draw_image(cairo_t *cr, const char *file, offset_t offset) {
   img = cairo_image_surface_create_from_png(file);
   int w = cairo_image_surface_get_width(img);
   int h = cairo_image_surface_get_height(img);
-  img = scale_surface (img, w, h, settings.height, settings.height);
+  int neww = (int)(((float)(settings.height) * ((float)(w) / (float)(h))) + 0.49999999);
+  img = scale_surface (img, w, h, neww, settings.height);
   h = settings.height;
-  w = settings.height;
+  w = neww;
   /* Attempt to center the image if it is not the height of the line. */ 
   int image_offset = (h - settings.height) / 2;
   cairo_set_source_surface(cr, img, offset.x, offset.image_y - h + image_offset);
