@@ -6,7 +6,7 @@ A simple flexible popup dialog to run on X.
 </p>
 
 
-In the demo a hotkey is mapped to `lighthouse | sh` with `lighthouserc` using `cmd.py`, which is included in `config/lighthouse/` but not installed by `make config`. Explanation below.
+In the demo a hotkey is mapped to `lighthouse | sh` with `lighthouserc` using `cmd.py`, which is included in `config/lighthouse/` and installed by `make config`.
 # Installation
 
 Available in the AUR as [lighthouse-git](https://aur.archlinux.org/packages/lighthouse-git/).
@@ -26,9 +26,9 @@ Create config files. (This is important!)
 
     make config
     
-You may also need to make the `cmd` script executable.  (If you replace this script, be sure to make that exectuable as well.)
+You may also need to make all the `cmd` scripts executable.  (If you write your own script, be sure to make that exectuable as well.)
 
-    chmod +x ~/.config/lighthouse/cmd
+    chmod +x ~/.config/lighthouse/cmd*
 
 Dependencies
 ---
@@ -49,8 +49,8 @@ Ubuntu:
     libx11-xcb-dev
     libcairo2-dev
     libxcb-xkb-dev
-	libxcb-xinerama0-dev
-	libxcb-randr0-dev
+    libxcb-xinerama0-dev
+    libxcb-randr0-dev
 
 NixOS:
 
@@ -84,6 +84,7 @@ To create multiple results simply chain them together: `{ title1 | action1 }{ ti
 
 There is also image support in the form `{ %Ifile.png% <- an image! | feh file.png }`.
 To use `%` as a character, escape it with `\%`.
+Currently only PNG images are supported.
 
 Other ways to use lighthouse
 ---
@@ -95,7 +96,8 @@ Debugging your script
 ---
 Run `lighthouse` in your terminal and look at the output.  If the script crahes you'll see its
 standard error, and if it succeeds you'll see what lighthouse is outputting.  Check out
-`config/lighthouse/cmd.py` for an example of how more complicated scripts should work.
+`config/lighthouse/cmd` for an example of a basic script and `config/lighthouse/cmd.py` for a
+more complex script.
 
 Note that any files being used by lighthouse, including images in the results, the command file and optional configuration files must escape certain characters: ` |, &, ;, <, >, (, ), {, }`.
 

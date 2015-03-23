@@ -54,6 +54,10 @@
 
 #include <xcb_keysyms.h>  /* xcb_key_symbols_alloc, xcb_key_press_lookup_keysym */
 
+/* declared in <string.h>, but not unless you define a suitable macro. Not sure which macro
+   (see `man strdup`) is correct for this situation. */
+extern char *strdup (const char *__s);
+
 /** @brief Defaults for settings. */
 #define HEIGHT            30
 #define MAX_HEIGHT        7 * HEIGHT
@@ -330,9 +334,10 @@ static uint32_t draw_image(cairo_t *cr, const char *file, offset_t offset) {
   img = cairo_image_surface_create_from_png(file);
   int w = cairo_image_surface_get_width(img);
   int h = cairo_image_surface_get_height(img);
-  img = scale_surface (img, w, h, settings.height, settings.height);
+  int neww = (int)(((float)(settings.height) * ((float)(w) / (float)(h))) + 0.49999999);
+  img = scale_surface (img, w, h, neww, settings.height);
   h = settings.height;
-  w = settings.height;
+  w = neww;
   /* Attempt to center the image if it is not the height of the line. */ 
   int image_offset = (h - settings.height) / 2;
   cairo_set_source_surface(cr, img, offset.x, offset.image_y - h + image_offset);
@@ -791,7 +796,7 @@ cleanup:
  * @param from_child_fd The fd used to read from the child process.
  * @return 0 on success and 1 on failure.
  */
-static int32_t spawn_piped_process(char *file, int32_t *to_child_fd, int32_t *from_child_fd) {
+static int32_t spawn_piped_process(char *file, int32_t *to_child_fd, int32_t *from_child_fd, char **argv) {
   /* Create pipes for IPC with the user process. */
   int32_t in_pipe[2];
   int32_t out_pipe[2];
@@ -825,7 +830,8 @@ static int32_t spawn_piped_process(char *file, int32_t *to_child_fd, int32_t *fr
       file = expanded_file.we_wordv[0];
     }
 
-    execlp(file, file, NULL);
+    argv[0] = file;
+    execvp(file, (char * const *)argv);
     fprintf(stderr, "Couldn't execute file: %s\n", strerror(errno));
     close(out_pipe[1]);
     close(in_pipe[0]);
@@ -840,7 +846,6 @@ static int32_t spawn_piped_process(char *file, int32_t *to_child_fd, int32_t *fr
 
   *from_child_fd = out_pipe[0];
   *to_child_fd = in_pipe[1];
-
   return 0;
 }
 
@@ -1072,6 +1077,8 @@ void kill_zombie(void) {
   while(wait(NULL) == -1);
 }
 
+
+
 /* @brief The main function. Initialization happens here.
  *
  * @return 0 on success and 1 on failure.
@@ -1096,16 +1103,38 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  int i;
+  enum { MAX_ARGS = 64 };
+  int nargs = 0;
+  char *cmdargs[MAX_ARGS];
+
+  /* one extra for the NULL */
+  nargs = (argc - optind) + 2;
+  if (nargs > 63)
+    nargs = 63;
+
+  for (i=optind; i < argc; i++) {
+    if ((i - optind) + 1 > 62)
+      break;
+    cmdargs[(i - optind) + 1] = strdup(argv[i]);
+  }
+
+  cmdargs[nargs - 1] = NULL;
+
   /* Set up the remote process. */
   int32_t to_child_fd, from_child_fd;
 
   char *exec_file = settings.cmd;
 
-  if (spawn_piped_process(exec_file, &to_child_fd, &from_child_fd)) {
+  if (spawn_piped_process(exec_file, &to_child_fd, &from_child_fd, (char **)cmdargs)) {
     fprintf(stderr, "Failed to spawn piped process.\n");
     exit_code = 1;
     return exit_code;
   }
+
+  /* Don't free #0, it is filled in by spawn_piped_process() and isn't memory that we own */
+  for (i=1; i < nargs - 1 ; i++)
+    free(cmdargs[i]);
 
   /* The main way to communicate with our remote process. */ 
   FILE *to_child = fdopen(to_child_fd, "w");
