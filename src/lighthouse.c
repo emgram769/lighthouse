@@ -15,10 +15,10 @@
  *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  *  copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
- *  
+ *
  *  The above copyright notice and this permission notice shall be included in
  *  all copies or substantial portions of the Software.
- *  
+ *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -177,6 +177,11 @@ static struct {
 
   /* Which desktop to run on. */
   uint32_t desktop;
+
+  /* Set to 1 to use _NET_WM_WINDOW_TYPE_DOCK
+   * Set to 0 to use _NET_WM_WINDOW_TYPE_DIALOG (for i3 users)
+   */
+  uint32_t dock_mode;
 } settings;
 
 /* @brief Check the xcb cookie and prints an error if it has one.
@@ -196,7 +201,7 @@ static inline int32_t check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_
   return 0;
 }
 
-/* @brief Returns the offset for a line of text. 
+/* @brief Returns the offset for a line of text.
  *
  * @param line the index of the line to be drawn (counting from the top).
  * @return the line's offset.
@@ -338,7 +343,7 @@ static uint32_t draw_image(cairo_t *cr, const char *file, offset_t offset) {
   img = scale_surface (img, w, h, neww, settings.height);
   h = settings.height;
   w = neww;
-  /* Attempt to center the image if it is not the height of the line. */ 
+  /* Attempt to center the image if it is not the height of the line. */
   int image_offset = (h - settings.height) / 2;
   cairo_set_source_surface(cr, img, offset.x, offset.image_y - h + image_offset);
   cairo_mask_surface(cr, img, offset.x, offset.image_y - h + image_offset);
@@ -670,11 +675,11 @@ static int32_t write_to_remote(FILE *child, char *format, ...) {
 }
 
 /* @brief Processes an entered key by:
- * 
+ *
  * 1) Adding the key to the query buffer (backspace will remove a character).
  * 2) Drawing the updated query to the screen if necessary.
  * 3) Writing the updated query to the child process if necessary.
- * 
+ *
  * @param query_buffer The string of the current query (what is typed).
  * @param query_index A reference to the current length of the query.
  * @param query_cursor_index A reference to the current index of the cursor
@@ -894,6 +899,8 @@ static void set_setting(char *param, char *val) {
     sscanf(val, "%f,%f,%f", &settings.highlight_bg.r, &settings.highlight_bg.g, &settings.highlight_bg.b);
   } else if (!strcmp("desktop", param)) {
     sscanf(val, "%u", &settings.desktop);
+  } else if (!strcmp("dock_mode", param)) {
+    sscanf(val, "%u", &settings.dock_mode);
   }
 }
 
@@ -994,7 +1001,7 @@ xinerama:
 
 /* @brief Initializes the settings global structure and read in the configuration
  *        file.
- * 
+ *
  * Note: this function does not initialize settings.screen_* data.
  *
  * @return Void.
@@ -1021,6 +1028,7 @@ static int initialize_settings(char *config_file) {
   settings.desktop = 0xFFFFFFFF;
   settings.screen = 0;
   settings.backspace_exit = 1;
+  settings.dock_mode = 1;
 
   /* Read in from the config file. */
   wordexp_t expanded_file;
@@ -1136,7 +1144,7 @@ int main(int argc, char **argv) {
   for (i=1; i < nargs - 1 ; i++)
     free(cmdargs[i]);
 
-  /* The main way to communicate with our remote process. */ 
+  /* The main way to communicate with our remote process. */
   FILE *to_child = fdopen(to_child_fd, "w");
 
   /* Connect to the X server. */
@@ -1171,14 +1179,19 @@ int main(int argc, char **argv) {
   /* Get the atoms to create a dock window type. */
   xcb_atom_t window_type_atom, window_type_dock_atom;
   xcb_intern_atom_cookie_t atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_WINDOW_TYPE"), "_NET_WM_WINDOW_TYPE");
-  xcb_intern_atom_reply_t *atom_reply = xcb_intern_atom_reply(connection, atom_cookie, NULL); 
+  xcb_intern_atom_reply_t *atom_reply = xcb_intern_atom_reply(connection, atom_cookie, NULL);
   if (!atom_reply) {
     fprintf(stderr, "Unable to set window type. You will need to manually set your window manager to run lighthouse as you'd like.\n");
   } else {
     window_type_atom = atom_reply->atom;
     free(atom_reply);
 
-    atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_WINDOW_TYPE_DOCK"), "_NET_WM_WINDOW_TYPE_DOCK");
+    if (settings.dock_mode) {
+        atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_WINDOW_TYPE_DOCK"), "_NET_WM_WINDOW_TYPE_DOCK");
+    }
+    else {
+        atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_WINDOW_TYPE_DIALOG"), "_NET_WM_WINDOW_TYPE_DIALOG");
+    }
     atom_reply = xcb_intern_atom_reply(connection, atom_cookie, NULL);
     if (atom_reply) {
       window_type_dock_atom = atom_reply->atom;
@@ -1192,7 +1205,7 @@ int main(int argc, char **argv) {
   /* Now set which desktop to run on. */
   xcb_atom_t desktop_atom;
   atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_DESKTOP"), "_NET_WM_DESKTOP");
-  atom_reply = xcb_intern_atom_reply(connection, atom_cookie, NULL); 
+  atom_reply = xcb_intern_atom_reply(connection, atom_cookie, NULL);
   if (!atom_reply) {
     fprintf(stderr, "Unable to set a specific desktop to launch on.\n");
   } else {
@@ -1220,7 +1233,7 @@ int main(int argc, char **argv) {
       xcb_change_property_checked(connection, XCB_PROP_MODE_REPLACE, window, state_atom, XCB_ATOM_ATOM, 32, 1, &attention_state_atom);
     }
   }
-  
+
   /* Get multiscreen information or default to the screen properties. */
   if (get_multiscreen_settings(connection, screen)) {
     settings.screen_width = screen->width_in_pixels;
@@ -1235,7 +1248,7 @@ int main(int argc, char **argv) {
     XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, strlen(title), title);
   xcb_change_property(connection, XCB_PROP_MODE_REPLACE, window,
     XCB_ATOM_WM_CLASS, XCB_ATOM_STRING, 8, strlen(title), title);
-  
+
   /* Find the visualtype by iterating through depths. */
   xcb_visualtype_t *visual = NULL;
   xcb_depth_iterator_t depth_iter = xcb_screen_allowed_depths_iterator(screen);
@@ -1269,14 +1282,14 @@ int main(int argc, char **argv) {
     fprintf(stderr, "Failed to create mutex.");
     goto cleanup;
   }
-  
+
   if (pthread_mutex_init(&global.result_mutex, NULL)) {
     fprintf(stderr, "Failed to create mutex.");
     goto cleanup;
   }
 
   struct result_params results_thr_params;
-  results_thr_params.fd = from_child_fd; 
+  results_thr_params.fd = from_child_fd;
   results_thr_params.cr = cairo_context;
   results_thr_params.cr_surface = cairo_surface;
   results_thr_params.connection = connection;
@@ -1297,12 +1310,12 @@ int main(int argc, char **argv) {
 
   /* Now draw everything. */
   redraw_all(connection, window, cairo_context, cairo_surface, query_string, query_cursor_index);
-  
+
   /* and center it */
   values[0] = settings.screen_x + settings.x * settings.screen_width / 100 - settings.width / 2;
   values[1] = settings.screen_y + settings.y * settings.screen_height / 100 - settings.height / 2;
   xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
-  
+
   xcb_generic_event_t *event;
   while ((event = xcb_wait_for_event(connection))) {
     switch (event->response_type & ~0x80) {
