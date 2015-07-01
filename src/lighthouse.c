@@ -1098,6 +1098,9 @@ int main(int argc, char **argv) {
   /* Determine if there is an XDG_CONFIG_HOME to put the config in, otherwise use ~/.config */
   char *config_file_dir = (getenv("XDG_CONFIG_HOME")) ? getenv("XDG_CONFIG_HOME") : "~/.config";
   char *config_file = malloc(strlen(config_file_dir) + strlen(CONFIG_FILE) + 1);
+  if (!config_file) {
+    return 1;
+  }
   sprintf(config_file, "%s%s", config_file_dir, CONFIG_FILE);
   int c;
   while ((c = getopt(argc, argv, "c:")) != -1) {
