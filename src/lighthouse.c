@@ -99,8 +99,9 @@ typedef struct {
 
 /* @brief Type used to maintain a list of results in a usable form. */
 typedef struct {
-  char *action;
   char *text;
+  char *action;
+  char *desc;
 } result_t;
 
 /* @brief The type of data to draw. */
@@ -440,6 +441,47 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
   pthread_mutex_unlock(&global.draw_mutex);
 }
 
+/* @brief Draw a description to a cairo context.
+ *
+ * @param cr A cairo context for drawing to the screen.
+ * @param text The description to be drawn.
+ * @param foreground The color of the text.
+ * @param background The color of the background.
+ * @return Void.
+ */
+static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_t *background) {
+  pthread_mutex_lock(&global.draw_mutex);
+  printf(text);
+  cairo_set_source_rgb(cr, background->r, background->g, background->b);
+  /* Add 2 to fix a weird offsetting bug. TODO: Fix the bug properly. */
+  cairo_rectangle(cr, settings.width, 0, settings.width+500, settings.height+500);
+  cairo_stroke_preserve(cr);
+  cairo_fill(cr);
+  offset_t offset = {settings.width, 50, 0};
+
+  /* Parse the response line as we draw it. */
+  char *c = (char *)text;
+  while (c && *c != '\0') {
+    draw_t d = parse_response_line(&c);
+    char saved = *c;
+    *c = '\0';
+    switch (d.type) {
+      case DRAW_IMAGE:
+        offset.x += draw_image(cr, d.data, offset) + settings.height / 10;
+        break;
+      case DRAW_TEXT:
+      default:
+        offset.x += draw_text(cr, d.data, offset, foreground);
+        break;
+    }
+    *c = saved;
+  }
+
+  pthread_mutex_unlock(&global.draw_mutex);
+}
+
+
+
 /* @brief Draw the query text (what is typed).
  *
  * @param cr A cairo context for drawing to the screen.
@@ -467,17 +509,26 @@ static void draw_query_text(cairo_t *cr, cairo_surface_t *surface, const char *t
  */
 static void draw_response_text(xcb_connection_t *connection, xcb_window_t window, cairo_t *cr, cairo_surface_t *surface, result_t *results, uint32_t result_count) {
 
-  if (window != 0) {
-    uint32_t new_height = min(settings.height * (result_count + 1), settings.max_height);
-    uint32_t values[] = { settings.width, new_height};
-
-    xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
-    cairo_xcb_surface_set_size(surface, settings.width, new_height);
-  }
-
   int32_t line, index;
   if (global.result_count - 1 < global.result_highlight) {
     global.result_highlight = global.result_count - 1;
+  }
+
+  if (window != 0) {
+    if ((global.result_highlight < global.result_count) &&
+            results[global.result_highlight].desc) {
+        uint32_t new_height = min(settings.height * (result_count + 1), settings.max_height);
+        uint32_t values[] = { settings.width+500, new_height };
+
+        xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
+        cairo_xcb_surface_set_size(surface, settings.width+500, new_height);
+    } else {
+        uint32_t new_height = min(settings.height * (result_count + 1), settings.max_height);
+        uint32_t values[] = { settings.width, new_height };
+
+        xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
+        cairo_xcb_surface_set_size(surface, settings.width, new_height);
+    }
   }
 
   uint32_t max_results = settings.max_height / settings.height - 1;
@@ -494,6 +545,9 @@ static void draw_response_text(xcb_connection_t *connection, xcb_window_t window
       draw_line(cr, results[index].text, line, &settings.result_fg, &settings.result_bg);
     } else {
       draw_line(cr, results[index].text, line, &settings.highlight_fg, &settings.highlight_bg);
+      if (results[index].desc) {
+        draw_desc(cr, results[index].desc, &settings.highlight_fg, &settings.highlight_bg);
+      }
     }
   }
   cairo_surface_flush(surface);
@@ -526,7 +580,7 @@ static void redraw_all(xcb_connection_t *connection, xcb_window_t window, cairo_
  */
 static uint32_t parse_response_text(char *text, size_t length, result_t **results) {
   int32_t index, mode;
-  mode = 0; /* 0 -> closed, 1 -> opened no command, 2 -> opened, command */
+  mode = 0; /* 0 -> closed, 1 -> opened no command (action), 2 -> opened, command (desc)*/
   result_t *ret = calloc(1, sizeof(result_t));
   uint32_t count = 0;
   for (index = 0; text[index] != 0 && index < length; index++) {
@@ -558,14 +612,18 @@ static uint32_t parse_response_text(char *text, size_t length, result_t **result
     }
     /* Split brace. */
     else if (text[index] == '|') {
-      if (mode != 1) {
+      if ((mode != 1) && (mode != 2)) {
         fprintf(stderr, "Syntax error, found | at index %d.\n %s\n", index, text);
         free(ret);
         return 0;
       }
       text[index] = 0;
-      if (index + 1 < length) {
+      if ((index + 1 < length) && (mode == 1)){
         ret[count - 1].action = &(text[index+1]);
+        /* Can be a description or an action */
+      }
+      if ((index + 1 < length) && (mode == 2)){
+        ret[count - 1].desc = &(text[index+1]);
       }
       mode++;
     }
