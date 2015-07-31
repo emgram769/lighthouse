@@ -183,6 +183,9 @@ static struct {
    * Set to 0 to use _NET_WM_WINDOW_TYPE_DIALOG (for i3 users)
    */
   uint32_t dock_mode;
+
+  /* Description option */
+  uint32_t desc_size;
 } settings;
 
 /* @brief Check the xcb cookie and prints an error if it has one.
@@ -307,7 +310,6 @@ cairo_surface_t * scale_surface (cairo_surface_t *surface, int width, int height
     cairo_set_source_surface (cr, surface, 0, 0);
 
     cairo_pattern_set_extend (cairo_get_source(cr), CAIRO_EXTEND_REFLECT);
-
     cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
 
     cairo_paint (cr);
@@ -356,9 +358,10 @@ static uint32_t draw_image(cairo_t *cr, const char *file, offset_t offset) {
  *        a new location.
  * @param[in/out] c A reference to the pointer to the current section
  *                of text to parse.
+ * @param line_length TODO
  * @return A populated draw_t type.
  */
-static draw_t parse_response_line(char **c) {
+static draw_t parse_response_line(char **c, uint32_t line_length) {
   if (!c || !*c) {
     fprintf(stderr, "Invalid parse state");
     return (draw_t){ DRAW_TEXT, NULL }; /* This will invoke a segfault most likely. */
@@ -393,9 +396,15 @@ static draw_t parse_response_line(char **c) {
     type = DRAW_TEXT;
   }
 
+  int char_num = line_length / settings.font_size;
+  int i = 0;
+
   while (**c != '\0' && **c != '%'
-         && !(**c == '\\' && *(*c + 1) == '%')) {
+         && !(**c == '\\' && *(*c + 1) == '%')
+         && i < char_num) {
+      // TODO change here to parse a line only.
     *c += 1;
+    ++i;
   }
 
   return (draw_t){ type, data };
@@ -423,7 +432,7 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
   /* Parse the response line as we draw it. */
   char *c = (char *)text;
   while (c && *c != '\0') {
-    draw_t d = parse_response_line(&c);
+    draw_t d = parse_response_line(&c, settings.width);
     char saved = *c;
     *c = '\0';
     switch (d.type) {
@@ -451,18 +460,18 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
  */
 static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_t *background) {
   pthread_mutex_lock(&global.draw_mutex);
-  printf(text);
   cairo_set_source_rgb(cr, background->r, background->g, background->b);
   /* Add 2 to fix a weird offsetting bug. TODO: Fix the bug properly. */
-  cairo_rectangle(cr, settings.width, 0, settings.width+500, settings.height+500);
+  cairo_rectangle(cr, settings.width, 0,
+          settings.width+settings.desc_size, settings.height*(global.result_count+1));
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
-  offset_t offset = {settings.width, 50, 0};
+  offset_t offset = {settings.width, settings.font_size, settings.width};
 
   /* Parse the response line as we draw it. */
   char *c = (char *)text;
   while (c && *c != '\0') {
-    draw_t d = parse_response_line(&c);
+    draw_t d = parse_response_line(&c, settings.desc_size);
     char saved = *c;
     *c = '\0';
     switch (d.type) {
@@ -473,6 +482,11 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
       default:
         offset.x += draw_text(cr, d.data, offset, foreground);
         break;
+    }
+    if ((offset.x + settings.font_size) > (settings.width + settings.desc_size)) {
+        // if it's gonna write out of the line.
+        offset.x = settings.width;
+        offset.y += settings.font_size;
     }
     *c = saved;
   }
@@ -508,27 +522,9 @@ static void draw_query_text(cairo_t *cr, cairo_surface_t *surface, const char *t
  * @return Void.
  */
 static void draw_response_text(xcb_connection_t *connection, xcb_window_t window, cairo_t *cr, cairo_surface_t *surface, result_t *results, uint32_t result_count) {
-
   int32_t line, index;
   if (global.result_count - 1 < global.result_highlight) {
     global.result_highlight = global.result_count - 1;
-  }
-
-  if (window != 0) {
-    if ((global.result_highlight < global.result_count) &&
-            results[global.result_highlight].desc) {
-        uint32_t new_height = min(settings.height * (result_count + 1), settings.max_height);
-        uint32_t values[] = { settings.width+500, new_height };
-
-        xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
-        cairo_xcb_surface_set_size(surface, settings.width+500, new_height);
-    } else {
-        uint32_t new_height = min(settings.height * (result_count + 1), settings.max_height);
-        uint32_t values[] = { settings.width, new_height };
-
-        xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
-        cairo_xcb_surface_set_size(surface, settings.width, new_height);
-    }
   }
 
   uint32_t max_results = settings.max_height / settings.height - 1;
@@ -540,14 +536,31 @@ static void draw_response_text(xcb_connection_t *connection, xcb_window_t window
     global.result_offset = global.result_highlight;
   }
 
+  if (window != 0) {
+    if ((global.result_highlight < global.result_count) &&
+            results[global.result_highlight].desc) {
+        printf("%s \n", results[global.result_highlight].desc);
+        uint32_t new_height = min(settings.height * (result_count + 1), settings.max_height);
+        uint32_t values[] = { settings.width+settings.desc_size, new_height };
+
+        xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
+        cairo_xcb_surface_set_size(surface, settings.width+settings.desc_size, new_height);
+        draw_desc(cr, results[global.result_highlight].desc, &settings.highlight_fg, &settings.highlight_bg);
+    } else {
+        uint32_t new_height = min(settings.height * (result_count + 1), settings.max_height);
+        uint32_t values[] = { settings.width, new_height };
+
+        xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
+        cairo_xcb_surface_set_size(surface, settings.width, new_height);
+    }
+  }
+
+
   for (index = global.result_offset, line = 1; index < global.result_offset + display_results; index++, line++) {
     if (index != global.result_highlight) {
       draw_line(cr, results[index].text, line, &settings.result_fg, &settings.result_bg);
     } else {
       draw_line(cr, results[index].text, line, &settings.highlight_fg, &settings.highlight_bg);
-      if (results[index].desc) {
-        draw_desc(cr, results[index].desc, &settings.highlight_fg, &settings.highlight_bg);
-      }
     }
   }
   cairo_surface_flush(surface);
@@ -634,6 +647,10 @@ static uint32_t parse_response_text(char *text, size_t length, result_t **result
         free(ret);
         return 0;
       }
+      if (mode == 2) {
+        /* if no description was used in the user script. */
+        ret[count - 1].desc = NULL;
+      }
       text[index] = 0;
       mode = 0;
     }
@@ -705,9 +722,9 @@ void *get_results(void *args) {
     }
     global.results = results;
     global.result_count = result_count;
-    pthread_mutex_unlock(&global.result_mutex);
     debug("Recieved %d results.\n", result_count);
     draw_response_text(connection, window, cairo_context, cairo_surface, results, result_count);
+    pthread_mutex_unlock(&global.result_mutex);
   }
 }
 
@@ -749,7 +766,7 @@ static int32_t write_to_remote(FILE *child, char *format, ...) {
  * @param to_write A descriptor to write to the child process.
  * @return 0 on success and 1 on failure.
  */
-static inline int32_t process_key_stroke(char *query_buffer, uint32_t *query_index, uint32_t *query_cursor_index, xcb_keysym_t key, xcb_connection_t *connection, cairo_t *cairo_context, cairo_surface_t *cairo_surface, FILE *to_write) {
+static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer, uint32_t *query_index, uint32_t *query_cursor_index, xcb_keysym_t key, xcb_connection_t *connection, cairo_t *cairo_context, cairo_surface_t *cairo_surface, FILE *to_write) {
   pthread_mutex_lock(&global.result_mutex);
 
   /* Check when we should update. */
@@ -761,7 +778,6 @@ static inline int32_t process_key_stroke(char *query_buffer, uint32_t *query_ind
   switch (key) {
     case 65293: /* Enter. */
       if (global.results && global.result_highlight < global.result_count && global.result_highlight >= 0) {
-        printf("%s", global.results[global.result_highlight].action);
         goto cleanup;
       }
       break;
@@ -780,31 +796,31 @@ static inline int32_t process_key_stroke(char *query_buffer, uint32_t *query_ind
     case 65362: /* Up. */
       if (global.result_highlight > 0) {
         global.result_highlight--;
-        draw_response_text(connection, 0, cairo_context, cairo_surface, global.results, global.result_count);
+        draw_response_text(connection, window, cairo_context, cairo_surface, global.results, global.result_count);
       }
       break;
     case 65364: /* Down. */
       if (global.result_count && global.result_highlight < global.result_count - 1) {
         global.result_highlight++;
-        draw_response_text(connection, 0, cairo_context, cairo_surface, global.results, global.result_count);
+        draw_response_text(connection, window, cairo_context, cairo_surface, global.results, global.result_count);
       }
       break;
     case 65289: /* Tab. */
       if (global.result_count && global.result_highlight < global.result_count - 1) {
         global.result_highlight++;
-        draw_response_text(connection, 0, cairo_context, cairo_surface, global.results, global.result_count);
+        draw_response_text(connection, window, cairo_context, cairo_surface, global.results, global.result_count);
       } else if(global.result_count && global.result_highlight == global.result_count - 1) {
         global.result_highlight = 0;
-        draw_response_text(connection, 0, cairo_context, cairo_surface, global.results, global.result_count);
+        draw_response_text(connection, window, cairo_context, cairo_surface, global.results, global.result_count);
       }
       break;
     case 65056: /* Shift Tab */
       if (global.result_count && global.result_highlight > 0) {
         global.result_highlight--;
-        draw_response_text(connection, 0, cairo_context, cairo_surface, global.results, global.result_count);
+        draw_response_text(connection, window, cairo_context, cairo_surface, global.results, global.result_count);
       } else if(global.result_count && global.result_highlight == 0) {
         global.result_highlight = global.result_count - 1;
-        draw_response_text(connection, 0, cairo_context, cairo_surface, global.results, global.result_count);
+        draw_response_text(connection, window, cairo_context, cairo_surface, global.results, global.result_count);
       }
       break;
     case 65307: /* Escape. */
@@ -959,6 +975,8 @@ static void set_setting(char *param, char *val) {
     sscanf(val, "%u", &settings.desktop);
   } else if (!strcmp("dock_mode", param)) {
     sscanf(val, "%u", &settings.dock_mode);
+  } else if (!strcmp("desc_size", param)) {
+    sscanf(val, "%u", &settings.desc_size);
   }
 }
 
@@ -1370,7 +1388,8 @@ int main(int argc, char **argv) {
   redraw_all(connection, window, cairo_context, cairo_surface, query_string, query_cursor_index);
 
   /* and center it */
-  values[0] = settings.screen_x + settings.x * settings.screen_width / 100 - settings.width / 2;
+  // TODO
+  values[0] = - settings.desc_size + settings.screen_x + settings.x * settings.screen_width / 100 - settings.width / 2;
   values[1] = settings.screen_y + settings.y * settings.screen_height / 100 - settings.height / 2;
   xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
 
@@ -1393,7 +1412,7 @@ int main(int argc, char **argv) {
       case XCB_KEY_RELEASE: {
         xcb_key_release_event_t *k = (xcb_key_release_event_t *)event;
         xcb_keysym_t key = xcb_key_press_lookup_keysym(keysyms, k, k->state & ~XCB_MOD_MASK_2);
-        int32_t ret = process_key_stroke(query_string, &query_index, &query_cursor_index, key, connection, cairo_context, cairo_surface, to_child);
+        int32_t ret = process_key_stroke(window, query_string, &query_index, &query_cursor_index, key, connection, cairo_context, cairo_surface, to_child);
         if (ret <= 0) {
           exit_code = ret;
           goto cleanup;
