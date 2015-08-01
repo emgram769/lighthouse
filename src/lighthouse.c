@@ -218,9 +218,8 @@ static inline offset_t calculate_line_offset(uint32_t line) {
     offset_t result;
 
     result.x  = settings.horiz_padding;
-    result.y  = settings.height * (line + 1);
+    result.y  = settings.height * line + settings.font_size;
     result.image_y = result.y;
-    result.y -= (settings.height - settings.font_size) / 2;
 
     return result;
 }
@@ -240,7 +239,7 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
 
   /* Set the background. */
   cairo_set_source_rgb(cr, background->r, background->g, background->b);
-  cairo_rectangle(cr, 0, line * settings.height, settings.width, settings.height);
+  cairo_rectangle(cr, 0, line * settings.height, settings.width, (line + 1) * settings.height);
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
 
@@ -362,7 +361,7 @@ static uint32_t draw_image(cairo_t *cr, const char *file, offset_t offset) {
  *        a new location.
  * @param[in/out] c A reference to the pointer to the current section
  *                of text to parse.
- * @param line_length TODO
+ * @param line_length length in pixel of the line.
  * @return A populated draw_t type.
  */
 static draw_t parse_response_line(char **c, uint32_t line_length) {
@@ -427,8 +426,7 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
   pthread_mutex_lock(&global.draw_mutex);
 
   cairo_set_source_rgb(cr, background->r, background->g, background->b);
-  /* Add 2 to fix a weird offsetting bug. TODO: Fix the bug properly. */
-  cairo_rectangle(cr, 0, line * settings.height + 2, settings.width, settings.height);
+  cairo_rectangle(cr, 0, line * settings.height, settings.width, (line + 1) * settings.height);
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
   offset_t offset = calculate_line_offset(line);
@@ -465,7 +463,6 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
 static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_t *background) {
   pthread_mutex_lock(&global.draw_mutex);
   cairo_set_source_rgb(cr, background->r, background->g, background->b);
-  /* Add 2 to fix a weird offsetting bug. TODO: Fix the bug properly. */
   cairo_rectangle(cr, settings.width, 0,
           settings.width+settings.desc_size, settings.height*(global.result_count+1));
   cairo_stroke_preserve(cr);
@@ -1116,6 +1113,8 @@ static int initialize_settings(char *config_file) {
   settings.screen = 0;
   settings.backspace_exit = 1;
   settings.dock_mode = 1;
+  settings.desc_size = 300;
+  settings.auto_center = 1;
 
   /* Read in from the config file. */
   wordexp_t expanded_file;
