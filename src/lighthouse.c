@@ -218,8 +218,9 @@ static inline offset_t calculate_line_offset(uint32_t line) {
     offset_t result;
 
     result.x  = settings.horiz_padding;
-    result.y  = settings.height * line + settings.font_size;
-    result.image_y = result.y;
+    result.y  = settings.height * line + settings.font_size
+        + (settings.height - settings.font_size) / 3;
+    result.image_y = settings.height * (line + 1);
 
     return result;
 }
