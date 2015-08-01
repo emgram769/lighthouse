@@ -137,6 +137,9 @@ static struct {
   uint32_t result_offset;
   int32_t child_pid;
   pthread_t results_thr;
+  uint32_t win_x_pos;
+  uint32_t win_x_pos_with_desc;
+  uint32_t win_y_pos;
 } global;
 
 /* @brief A struct of settings that are set and used when the program starts. */
@@ -186,6 +189,7 @@ static struct {
 
   /* Description option */
   uint32_t desc_size;
+  uint32_t auto_center;
 } settings;
 
 /* @brief Check the xcb cookie and prints an error if it has one.
@@ -536,25 +540,29 @@ static void draw_response_text(xcb_connection_t *connection, xcb_window_t window
     global.result_offset = global.result_highlight;
   }
 
-  if (window != 0) {
-    if ((global.result_highlight < global.result_count) &&
-            results[global.result_highlight].desc) {
-        printf("%s \n", results[global.result_highlight].desc);
-        uint32_t new_height = min(settings.height * (result_count + 1), settings.max_height);
-        uint32_t values[] = { settings.width+settings.desc_size, new_height };
+  if ((global.result_highlight < global.result_count) &&
+          results[global.result_highlight].desc) {
+      if (settings.auto_center) {
+        uint32_t values[] = { global.win_x_pos_with_desc, global.win_y_pos };
+        xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
+      }
 
-        xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
-        cairo_xcb_surface_set_size(surface, settings.width+settings.desc_size, new_height);
-        draw_desc(cr, results[global.result_highlight].desc, &settings.highlight_fg, &settings.highlight_bg);
-    } else {
-        uint32_t new_height = min(settings.height * (result_count + 1), settings.max_height);
-        uint32_t values[] = { settings.width, new_height };
+      uint32_t new_height = min(settings.height * (result_count + 1), settings.max_height);
+      uint32_t values[] = { settings.width+settings.desc_size, new_height };
+      xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
+      cairo_xcb_surface_set_size(surface, settings.width+settings.desc_size, new_height);
+      draw_desc(cr, results[global.result_highlight].desc, &settings.highlight_fg, &settings.highlight_bg);
+  } else {
+      if (settings.auto_center) {
+        uint32_t values[] = { global.win_x_pos, global.win_y_pos };
+        xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
+      }
 
-        xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
-        cairo_xcb_surface_set_size(surface, settings.width, new_height);
-    }
+      uint32_t new_height = min(settings.height * (result_count + 1), settings.max_height);
+      uint32_t values[] = { settings.width, new_height };
+      xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
+      cairo_xcb_surface_set_size(surface, settings.width, new_height);
   }
-
 
   for (index = global.result_offset, line = 1; index < global.result_offset + display_results; index++, line++) {
     if (index != global.result_highlight) {
@@ -977,6 +985,8 @@ static void set_setting(char *param, char *val) {
     sscanf(val, "%u", &settings.dock_mode);
   } else if (!strcmp("desc_size", param)) {
     sscanf(val, "%u", &settings.desc_size);
+  } else if (!strcmp("auto_center", param)) {
+    sscanf(val, "%u", &settings.auto_center);
   }
 }
 
@@ -1388,9 +1398,19 @@ int main(int argc, char **argv) {
   redraw_all(connection, window, cairo_context, cairo_surface, query_string, query_cursor_index);
 
   /* and center it */
-  // TODO
-  values[0] = - settings.desc_size + settings.screen_x + settings.x * settings.screen_width / 100 - settings.width / 2;
-  values[1] = settings.screen_y + settings.y * settings.screen_height / 100 - settings.height / 2;
+  /* Assign value for the window position with and without description window */
+  global.win_x_pos_with_desc = settings.screen_x + settings.x * settings.screen_width / 100
+      - (settings.width + settings.desc_size) / 2;
+  global.win_x_pos = settings.screen_x + settings.x * settings.screen_width / 100 - settings.width / 2;
+  global.win_y_pos  = settings.screen_y + settings.y * settings.screen_height / 100 - settings.height / 2;
+
+  if (settings.auto_center) {
+    values[0] = global.win_x_pos;
+    values[1] = global.win_y_pos;
+  } else {
+    values[0] = global.win_x_pos_with_desc;
+    values[1] = global.win_y_pos;
+  }
   xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
 
   xcb_generic_event_t *event;
