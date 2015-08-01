@@ -525,14 +525,14 @@ static void draw_query_text(cairo_t *cr, cairo_surface_t *surface, const char *t
  * @param result_count The number of results to be drawn.
  * @return Void.
  */
-static void draw_response_text(xcb_connection_t *connection, xcb_window_t window, cairo_t *cr, cairo_surface_t *surface, result_t *results, uint32_t result_count) {
+static void draw_response_text(xcb_connection_t *connection, xcb_window_t window, cairo_t *cr, cairo_surface_t *surface, result_t *results) {
   int32_t line, index;
   if (global.result_count - 1 < global.result_highlight) {
     global.result_highlight = global.result_count - 1;
   }
 
   uint32_t max_results = settings.max_height / settings.height - 1;
-  uint32_t display_results = min(result_count, max_results);
+  uint32_t display_results = min(global.result_count, max_results);
   if ((global.result_offset + display_results) < (global.result_highlight + 1)) {
     global.result_offset = global.result_highlight - (display_results - 1);
     display_results = global.result_count - global.result_offset;
@@ -547,7 +547,7 @@ static void draw_response_text(xcb_connection_t *connection, xcb_window_t window
         xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
       }
 
-      uint32_t new_height = min(settings.height * (result_count + 1), settings.max_height);
+      uint32_t new_height = min(settings.height * (global.result_count + 1), settings.max_height);
       uint32_t values[] = { settings.width+settings.desc_size, new_height };
       xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
       cairo_xcb_surface_set_size(surface, settings.width+settings.desc_size, new_height);
@@ -558,7 +558,7 @@ static void draw_response_text(xcb_connection_t *connection, xcb_window_t window
         xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
       }
 
-      uint32_t new_height = min(settings.height * (result_count + 1), settings.max_height);
+      uint32_t new_height = min(settings.height * (global.result_count + 1), settings.max_height);
       uint32_t values[] = { settings.width, new_height };
       xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
       cairo_xcb_surface_set_size(surface, settings.width, new_height);
@@ -587,7 +587,7 @@ static void draw_response_text(xcb_connection_t *connection, xcb_window_t window
  */
 static void redraw_all(xcb_connection_t *connection, xcb_window_t window, cairo_t *cr, cairo_surface_t *surface, char *query_string, uint32_t query_cursor_index) {
   draw_query_text(cr, surface, query_string, query_cursor_index);
-  draw_response_text(connection, window, cr, surface, global.results, global.result_count);
+  draw_response_text(connection, window, cr, surface, global.results);
 }
 
 /* @brief Parses text to populate a results structure.
@@ -731,7 +731,7 @@ void *get_results(void *args) {
     global.results = results;
     global.result_count = result_count;
     debug("Recieved %d results.\n", result_count);
-    draw_response_text(connection, window, cairo_context, cairo_surface, results, result_count);
+    draw_response_text(connection, window, cairo_context, cairo_surface, results);
     pthread_mutex_unlock(&global.result_mutex);
   }
 }
@@ -805,31 +805,31 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
     case 65362: /* Up. */
       if (global.result_highlight > 0) {
         global.result_highlight--;
-        draw_response_text(connection, window, cairo_context, cairo_surface, global.results, global.result_count);
+        draw_response_text(connection, window, cairo_context, cairo_surface, global.results);
       }
       break;
     case 65364: /* Down. */
       if (global.result_count && global.result_highlight < global.result_count - 1) {
         global.result_highlight++;
-        draw_response_text(connection, window, cairo_context, cairo_surface, global.results, global.result_count);
+        draw_response_text(connection, window, cairo_context, cairo_surface, global.results);
       }
       break;
     case 65289: /* Tab. */
       if (global.result_count && global.result_highlight < global.result_count - 1) {
         global.result_highlight++;
-        draw_response_text(connection, window, cairo_context, cairo_surface, global.results, global.result_count);
+        draw_response_text(connection, window, cairo_context, cairo_surface, global.results);
       } else if(global.result_count && global.result_highlight == global.result_count - 1) {
         global.result_highlight = 0;
-        draw_response_text(connection, window, cairo_context, cairo_surface, global.results, global.result_count);
+        draw_response_text(connection, window, cairo_context, cairo_surface, global.results);
       }
       break;
     case 65056: /* Shift Tab */
       if (global.result_count && global.result_highlight > 0) {
         global.result_highlight--;
-        draw_response_text(connection, window, cairo_context, cairo_surface, global.results, global.result_count);
+        draw_response_text(connection, window, cairo_context, cairo_surface, global.results);
       } else if(global.result_count && global.result_highlight == 0) {
         global.result_highlight = global.result_count - 1;
-        draw_response_text(connection, window, cairo_context, cairo_surface, global.results, global.result_count);
+        draw_response_text(connection, window, cairo_context, cairo_surface, global.results);
       }
       break;
     case 65307: /* Escape. */
