@@ -330,6 +330,7 @@ cairo_surface_t * scale_surface (cairo_surface_t *surface, int width, int height
  * @return The advance in the x direction.
  */
 static uint32_t draw_image(cairo_t *cr, const char *file, offset_t offset) {
+    // TODO CHange parameter to know the size of the window.
   wordexp_t expanded_file;
   if (wordexp(file, &expanded_file, 0)) {
     fprintf(stderr, "Error expanding file %s\n", file);
@@ -437,7 +438,7 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
   /* Parse the response line as we draw it. */
   char *c = (char *)text;
   while (c && *c != '\0') {
-    draw_t d = parse_response_line(&c, settings.width);
+    draw_t d = parse_response_line(&c, settings.width - offset.x);
     char saved = *c;
     *c = '\0';
     switch (d.type) {
@@ -470,12 +471,12 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
           settings.width+settings.desc_size, settings.height*(global.result_count+1));
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
-  offset_t offset = {settings.width, settings.font_size, settings.width};
+  offset_t offset = {settings.width, settings.font_size, settings.font_size};
 
   /* Parse the response line as we draw it. */
   char *c = (char *)text;
   while (c && *c != '\0') {
-    draw_t d = parse_response_line(&c, settings.desc_size);
+    draw_t d = parse_response_line(&c, settings.desc_size - offset.x);
     char saved = *c;
     *c = '\0';
     switch (d.type) {
