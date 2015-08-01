@@ -378,9 +378,12 @@ static draw_t parse_response_line(char **c, uint32_t line_length) {
   if (**c == '%') {
     switch (*(*c+1)) {
       case 'I':
-        *c += 1;
-        data = *c+1;
+        *c += 2;
+        data = *c;
         type = DRAW_IMAGE;
+        while (**c != '%') {
+            *c += 1;
+        }
         break;
       default:
         *c += 1;
@@ -398,17 +401,16 @@ static draw_t parse_response_line(char **c, uint32_t line_length) {
       data = *c;
     }
     type = DRAW_TEXT;
-  }
 
-  int char_num = line_length / settings.font_size;
-  int i = 0;
-
-  while (**c != '\0' && **c != '%'
-         && !(**c == '\\' && *(*c + 1) == '%')
-         && i < char_num) {
-      // TODO change here to parse a line only.
-    *c += 1;
-    ++i;
+    int char_num = line_length / settings.font_size;
+    int i = 0;
+    while (**c != '\0' && **c != '%'
+            && !(**c == '\\' && *(*c + 1) == '%')
+            && i < char_num) {
+        // TODO change here to parse a line only.
+        *c += 1;
+        ++i;
+    }
   }
 
   return (draw_t){ type, data };
