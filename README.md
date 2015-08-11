@@ -74,12 +74,13 @@ printed to standard out (and in the case above, into the shell).
 Syntax
 ---
 The syntax of a result is simple.
-`{ title | action }`
+`{ title | action }`or `{ title | action | description }`
 The `title` is displayed in the results and the `action` is written to standard out
 when that result is selected.  A common use case would therefore be
 `lighthouse | sh` and `action` would be some shell command.  Run `make config` and then
 `lighthouse | sh` to see this in action.  The `title` will be `look! [input]` and the
 `action` will be `[input]`, so you've effectively created a small one time shell prompt.
+The description is a text displayed according to the highlighted selection.
 To create multiple results simply chain them together: `{ title1 | action1 }{ title2 | action2 }`
 
 There is also image support in the form `{ %Ifile.png% <- an image! | feh file.png }`.
