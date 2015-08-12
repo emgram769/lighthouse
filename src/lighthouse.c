@@ -159,6 +159,7 @@ static struct {
   uint32_t font_size;
   uint32_t horiz_padding;
   uint32_t cursor_padding;
+  int cursor_is_underline;
 
   /* Size. */
   uint32_t height;
@@ -269,11 +270,15 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
   cairo_show_text(cr, text);
 
   /* Draw the cursor. */
-  uint32_t cursor_y = offset.y - settings.font_size - settings.cursor_padding;
-  cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
-  cairo_rectangle(cr, cursor_x + 2, cursor_y, 0, settings.font_size + (settings.cursor_padding * 2));
-  cairo_stroke_preserve(cr);
-  cairo_fill(cr);
+  if (settings.cursor_is_underline) {
+    cairo_show_text(cr, "_");
+  } else {
+    uint32_t cursor_y = offset.y - settings.font_size - settings.cursor_padding;
+    cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
+    cairo_rectangle(cr, cursor_x + 2, cursor_y, 0, settings.font_size + (settings.cursor_padding * 2));
+    cairo_stroke_preserve(cr);
+    cairo_fill(cr);
+  }
 
   pthread_mutex_unlock(&global.draw_mutex);
 }
@@ -869,6 +874,8 @@ static void set_setting(char *param, char *val) {
     sscanf(val, "%u", &settings.horiz_padding);
   } else if (!strcmp("cursor_padding", param)) {
     sscanf(val, "%u", &settings.cursor_padding);
+  } else if (!strcmp("cursor_is_underline", param)) {
+    sscanf(val, "%d", &settings.cursor_is_underline);
   } else if (!strcmp("height", param)) {
     sscanf(val, "%u", &settings.height);
   } else if (!strcmp("width", param)) {
