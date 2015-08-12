@@ -72,8 +72,8 @@ extern char *strdup (const char *__s);
 #define MAX_CONFIG_SIZE   10 * 1024
 #define MAX_RESULT_SIZE   10 * 1024
 
-/* @brief Name of the file to search for. */
-#define CONFIG_FILE       "~/.config/lighthouse/lighthouserc"
+/* @brief Name of the file to search for. Directory appended at runtime. */
+#define CONFIG_FILE       "/lighthouse/lighthouserc"
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
@@ -1102,8 +1102,14 @@ int main(int argc, char **argv) {
   int32_t exit_code = 0;
   atexit(kill_zombie);
 
+  /* Determine if there is an XDG_CONFIG_HOME to put the config in, otherwise use ~/.config */
+  char *config_file_dir = (getenv("XDG_CONFIG_HOME")) ? getenv("XDG_CONFIG_HOME") : "~/.config";
+  char *config_file = malloc(strlen(config_file_dir) + strlen(CONFIG_FILE) + 1);
+  if (!config_file) {
+    return 1;
+  }
+  sprintf(config_file, "%s%s", config_file_dir, CONFIG_FILE);
   int c;
-  char *config_file = CONFIG_FILE;
   while ((c = getopt(argc, argv, "c:")) != -1) {
     switch (c) {
       case 'c':
@@ -1115,8 +1121,10 @@ int main(int argc, char **argv) {
   }
 
   if (initialize_settings(config_file)) {
+    free(config_file);
     return 1;
   }
+  free(config_file);
 
   int i;
   enum { MAX_ARGS = 64 };
