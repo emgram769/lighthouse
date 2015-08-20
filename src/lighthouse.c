@@ -107,7 +107,9 @@ typedef struct {
 /* @brief The type of data to draw. */
 typedef enum {
   DRAW_TEXT,
-  DRAW_IMAGE
+  DRAW_IMAGE,
+  BOLD,
+  NEW_LINE
 } draw_type_t;
 
 /* @brief Type used to pass around drawing options. */
@@ -293,12 +295,17 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
  * @param foreground The color of the text.
  * @return The advance in the x direction.
  */
-static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_t *foreground) {
+static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_t *foreground, int bold) {
   cairo_text_extents_t extents;
   cairo_text_extents(cr, text, &extents);
   cairo_move_to(cr, offset.x, offset.y);
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
-  cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  // Change to be more efficient.
+  if (bold) {
+    cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+  } else {
+    cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  }
   cairo_set_font_size(cr, settings.font_size);
   cairo_show_text(cr, text);
   return extents.x_advance;
@@ -359,6 +366,19 @@ static uint32_t draw_image(cairo_t *cr, const char *file, offset_t offset) {
   return w;
 }
 
+/* @brief Get character between % (function called from parse_response_line).
+ * @param c A reference to the pointer to the current section
+ * @param data A pointer to the data variable
+ */
+void get_in(char **c, char **data) {
+    *c += 2;
+    *data = *c;
+    while (**c != '%') {
+        *c += 1;
+    }
+}
+
+
 /* @brief Parses the text pointed to by *c and moves *c to
  *        a new location.
  * @param[in/out] c A reference to the pointer to the current section
@@ -379,18 +399,23 @@ static draw_t parse_response_line(char **c, uint32_t line_length) {
   if (**c == '%') {
     switch (*(*c+1)) {
       case 'I':
-        *c += 2;
-        data = *c;
         type = DRAW_IMAGE;
-        while (**c != '%') {
-            *c += 1;
-        }
+        get_in(c, &data);
+        break;
+      case 'B':
+        type = BOLD;
+        get_in(c, &data);
+        break;
+      case 'N':
+        type = NEW_LINE;
+        *c += 2;
         break;
       default:
         *c += 1;
         data = *c;
         break;
     }
+
   } else {
     /* Escape character. */
     if (**c == '\\' && *(*c + 1) == '%') {
@@ -404,11 +429,12 @@ static draw_t parse_response_line(char **c, uint32_t line_length) {
     type = DRAW_TEXT;
 
     int char_num = line_length / settings.font_size;
+    // TODO Change to be more precise
     int i = 0;
     while (**c != '\0' && **c != '%'
             && !(**c == '\\' && *(*c + 1) == '%')
-            && i < char_num) {
-        // TODO change here to parse a line only.
+            && i < char_num
+            && **c != '\n') {
         *c += 1;
         ++i;
     }
@@ -445,9 +471,12 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
       case DRAW_IMAGE:
         offset.x += draw_image(cr, d.data, offset) + settings.height / 10;
         break;
+      case BOLD:
+        offset.x += draw_text(cr, d.data, offset, foreground, 1);
+        break;
       case DRAW_TEXT:
       default:
-        offset.x += draw_text(cr, d.data, offset, foreground);
+        offset.x += draw_text(cr, d.data, offset, foreground, 0);
         break;
     }
     *c = saved;
@@ -483,9 +512,16 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
       case DRAW_IMAGE:
         offset.x += draw_image(cr, d.data, offset) + settings.height / 10;
         break;
+      case NEW_LINE:
+        offset.x = settings.width;
+        offset.y += settings.font_size;
+        break;
+      case BOLD:
+        offset.x += draw_text(cr, d.data, offset, foreground, 1);
+        break;
       case DRAW_TEXT:
       default:
-        offset.x += draw_text(cr, d.data, offset, foreground);
+        offset.x += draw_text(cr, d.data, offset, foreground, 0);
         break;
     }
     if ((offset.x + settings.font_size) > (settings.width + settings.desc_size)) {
