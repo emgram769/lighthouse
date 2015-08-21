@@ -295,17 +295,12 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
  * @param foreground The color of the text.
  * @return The advance in the x direction.
  */
-static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_t *foreground, int bold) {
+static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_t *foreground, cairo_font_weight_t weight) {
   cairo_text_extents_t extents;
   cairo_text_extents(cr, text, &extents);
   cairo_move_to(cr, offset.x, offset.y);
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
-  // Change to be more efficient.
-  if (bold) {
-    cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
-  } else {
-    cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  }
+  cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, weight);
   cairo_set_font_size(cr, settings.font_size);
   cairo_show_text(cr, text);
   return extents.x_advance;
@@ -472,11 +467,13 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
         offset.x += draw_image(cr, d.data, offset) + settings.height / 10;
         break;
       case BOLD:
-        offset.x += draw_text(cr, d.data, offset, foreground, 1);
+        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_BOLD);
+        break;
+      case NEW_LINE:
         break;
       case DRAW_TEXT:
       default:
-        offset.x += draw_text(cr, d.data, offset, foreground, 0);
+        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_NORMAL);
         break;
     }
     *c = saved;
