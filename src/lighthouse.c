@@ -1314,8 +1314,7 @@ int main(int argc, char **argv) {
 
     if (settings.dock_mode) {
         atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_WINDOW_TYPE_DOCK"), "_NET_WM_WINDOW_TYPE_DOCK");
-    }
-    else {
+    } else {
         atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_WINDOW_TYPE_DIALOG"), "_NET_WM_WINDOW_TYPE_DIALOG");
     }
     atom_reply = xcb_intern_atom_reply(connection, atom_cookie, NULL);
