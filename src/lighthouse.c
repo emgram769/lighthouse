@@ -765,7 +765,10 @@ void *get_results(void *args) {
     global.results = results;
     global.result_count = result_count;
     debug("Recieved %d results.\n", result_count);
-    draw_response_text(connection, window, cairo_context, cairo_surface, results);
+    if (global.result_count) {
+        /* TODO It seem to sigv when there's is no result sent, this work for the momebt*/
+        draw_response_text(connection, window, cairo_context, cairo_surface, results);
+    }
     pthread_mutex_unlock(&global.result_mutex);
   }
 }
@@ -876,7 +879,7 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
         query_buffer[(*query_index)] = 0;
         redraw = 1;
         resend = 1;
-      } else if (*query_index == 0 && settings.backspace_exit) { /* Backspace with nothing? */
+      } else if (*query_index == 0 && settings.backspace_exit) { /* Backspace with nothing */
         goto cleanup;
       }
       break;
