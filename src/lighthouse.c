@@ -766,8 +766,12 @@ void *get_results(void *args) {
     global.result_count = result_count;
     debug("Recieved %d results.\n", result_count);
     if (global.result_count) {
-        /* TODO It seem to sigv when there's is no result sent, this work for the momebt*/
         draw_response_text(connection, window, cairo_context, cairo_surface, results);
+    } else {
+      /* If no result found, just draw an empty window. */
+      uint32_t values[] = { settings.width, settings.height };
+      xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
+      cairo_xcb_surface_set_size(cairo_surface, settings.width, settings.height);
     }
     pthread_mutex_unlock(&global.result_mutex);
   }
