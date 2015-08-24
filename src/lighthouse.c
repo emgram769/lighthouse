@@ -517,7 +517,7 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
           settings.width+settings.desc_size, settings.height*(global.result_count+1));
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
-  offset_t offset = {settings.width, settings.font_size, settings.font_size};
+  offset_t offset = {settings.width, global.real_font_size, global.real_font_size};
 
   /* Parse the response line as we draw it. */
   char *c = (char *)text;
@@ -545,7 +545,7 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
     if ((offset.x + settings.font_size) > (settings.width + settings.desc_size)) {
         /* Checking if it's gonna write out of the square space. */
         offset.x = settings.width;
-        offset.y += settings.font_size;
+        offset.y += global.real_font_size;
     }
   }
 
