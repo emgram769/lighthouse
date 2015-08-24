@@ -142,6 +142,7 @@ static struct {
   uint32_t win_x_pos;
   uint32_t win_x_pos_with_desc;
   uint32_t win_y_pos;
+  double real_font_size;
 } global;
 
 /* @brief A struct of settings that are set and used when the program starts. */
@@ -218,10 +219,8 @@ static inline int32_t check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_
  */
 static inline offset_t calculate_line_offset(uint32_t line) {
     offset_t result;
-
     result.x  = settings.horiz_padding;
-    result.y  = settings.height * line + settings.font_size
-        + (settings.height - settings.font_size) / 3;
+    result.y  = settings.height * line + global.real_font_size;
     result.image_y = settings.height * (line + 1);
 
     return result;
@@ -332,7 +331,7 @@ cairo_surface_t * scale_surface (cairo_surface_t *surface, int width, int height
  * @return The advance in the x direction.
  */
 static uint32_t draw_image(cairo_t *cr, const char *file, offset_t offset) {
-    // TODO CHange parameter to know the size of the window.
+  // TODO CHange parameter to know the size of the window.
   wordexp_t expanded_file;
   if (wordexp(file, &expanded_file, 0)) {
     fprintf(stderr, "Error expanding file %s\n", file);
@@ -376,12 +375,13 @@ void get_in(char **c, char **data) {
 
 /* @brief Parses the text pointed to by *c and moves *c to
  *        a new location.
+ *
+ * @param *cr a cairo context (used to know the space used by the font).
  * @param[in/out] c A reference to the pointer to the current section
- *                of text to parse.
  * @param line_length length in pixel of the line.
  * @return A populated draw_t type.
  */
-static draw_t parse_response_line(char **c, uint32_t line_length) {
+static draw_t parse_response_line(cairo_t *cr, char **c, uint32_t line_length) {
   if (!c || !*c) {
     fprintf(stderr, "Invalid parse state");
     return (draw_t){ DRAW_TEXT, NULL }; /* This will invoke a segfault most likely. */
@@ -423,15 +423,31 @@ static draw_t parse_response_line(char **c, uint32_t line_length) {
     }
     type = DRAW_TEXT;
 
-    int char_num = line_length / settings.font_size;
-    // TODO Change to be more precise
-    int i = 0;
-    while (**c != '\0' && **c != '%'
-            && !(**c == '\\' && *(*c + 1) == '%')
-            && i < char_num
-            && **c != '\n') {
-        *c += 1;
-        ++i;
+    cairo_text_extents_t extents;
+    /* http://cairographics.org/manual/cairo-cairo-scaled-font-t.html#cairo-text-extents-t
+     * For more information on cairo text extents.
+     */
+    cairo_text_extents(cr, data, &extents);
+    double base_line_length = extents.x_advance;
+    /* length of the line from the data variable position */
+    if (base_line_length > line_length) {
+        /* Checking if the text is long enough to exceed the line length
+         * so we know if we have to check when the line is full.
+         */
+        while (**c != '\0' && **c != '%'
+               && !(**c == '\\' && *(*c + 1) == '%')) {
+            *c += 1;
+            cairo_text_extents(cr, *c, &extents);
+            if ((base_line_length - extents.x_advance) > line_length) {
+                *c -= 1;
+                break;
+            }
+        }
+    } else {
+        while (**c != '\0' && **c != '%'
+               && !(**c == '\\' && *(*c + 1) == '%')) {
+            *c += 1;
+        }
     }
   }
 
@@ -459,7 +475,11 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
   /* Parse the response line as we draw it. */
   char *c = (char *)text;
   while (c && *c != '\0') {
-    draw_t d = parse_response_line(&c, settings.width - offset.x);
+    draw_t d = parse_response_line(cr, &c, settings.width - offset.x);
+    if (d.data == c)
+        break;
+    /* Checking if there are still char to draw. */
+
     char saved = *c;
     *c = '\0';
     switch (d.type) {
@@ -502,7 +522,7 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
   /* Parse the response line as we draw it. */
   char *c = (char *)text;
   while (c && *c != '\0') {
-    draw_t d = parse_response_line(&c, settings.desc_size - offset.x);
+    draw_t d = parse_response_line(cr, &c, settings.desc_size + settings.width - offset.x);
     char saved = *c;
     *c = '\0';
     switch (d.type) {
@@ -521,12 +541,12 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
         offset.x += draw_text(cr, d.data, offset, foreground, 0);
         break;
     }
+    *c = saved;
     if ((offset.x + settings.font_size) > (settings.width + settings.desc_size)) {
-        // if it's gonna write out of the line.
+        /* Checking if it's gonna write out of the square space. */
         offset.x = settings.width;
         offset.y += settings.font_size;
     }
-    *c = saved;
   }
 
   pthread_mutex_unlock(&global.draw_mutex);
@@ -1405,6 +1425,15 @@ int main(int argc, char **argv) {
     cairo_surface_destroy(cairo_surface);
     goto cleanup;
   }
+
+  /* Getting the recommended free space for the font see
+   * http://cairographics.org/manual/cairo-cairo-scaled-font-t.html#cairo-font-extents-t
+   * for more information. */
+  cairo_select_font_face(cairo_context, settings.font_name, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  cairo_set_font_size(cairo_context, settings.font_size);
+  cairo_font_extents_t extents;
+  cairo_font_extents(cairo_context, &extents);
+  global.real_font_size = extents.height;
 
   /* Spawn a thread to listen to our remote process. */
   if (pthread_mutex_init(&global.draw_mutex, NULL)) {
