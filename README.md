@@ -83,9 +83,13 @@ when that result is selected.  A common use case would therefore be
 The description is a text displayed according to the highlighted selection.
 To create multiple results simply chain them together: `{ title1 | action1 }{ title2 | action2 }`
 
-There is also image support in the form `{ %Ifile.png% <- an image! | feh file.png }`.
+> There is also image support in the form `{ %Ifile.png% <- an image! | feh file.png }`.
 To use `%` as a character, escape it with `\%`.
 Currently only PNG images are supported.
+
+> To go to the next line (in description window) use `%N`
+
+> To format your text in bold use `%B text... %`
 
 Other ways to use lighthouse
 ---
