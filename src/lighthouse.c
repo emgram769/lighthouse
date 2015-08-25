@@ -445,6 +445,8 @@ static draw_t parse_response_line(cairo_t *cr, char **c, uint32_t line_length) {
             cairo_text_extents(cr, *c, &extents);
             if ((base_line_length - extents.x_advance) > line_length) {
                 *c -= 1;
+                if (*c == data)
+                    data = NULL;
                 break;
             }
         }
@@ -481,7 +483,7 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
   char *c = (char *)text;
   while (c && *c != '\0') {
     draw_t d = parse_response_line(cr, &c, settings.width - offset.x);
-    if (d.data == c)
+    if (d.data == NULL)
         break;
     /* Checking if there are still char to draw. */
 
