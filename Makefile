@@ -11,13 +11,20 @@ CFLAGS+=-O2 -Wall -std=c99
 CFLAGS_DEBUG+=-O0 -g3 -Werror -DDEBUG -pedantic
 LDFLAGS+=-lxcb -lxcb-xkb -lxcb-xinerama -lxcb-randr -lcairo -lpthread
 
+# OS X keeps xcb in a different spot
+platform=$(shell uname)
+ifeq ($(platform),Darwin)
+	CFLAGS+=-I/usr/X11/include
+	LDFLAGS+=-L/usr/X11/lib
+endif
+
 all: lighthouse
 
 debug: CC+=$(CFLAGS_DEBUG)
 debug: lighthouse .FORCE
 
 config: lighthouse .FORCE
-	cp -ir config/* ~/.config/
+	cp -ir ./config/* ~/.config/
 	chmod +x ~/.config/lighthouse/cmd*
 
 .FORCE:

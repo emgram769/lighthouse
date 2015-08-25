@@ -763,12 +763,12 @@ void *get_results(void *args) {
   xcb_connection_t *connection = ((struct result_params *)args)->connection;
   xcb_window_t window = ((struct result_params *)args)->window;
 
-  size_t res;
+  int64_t res;
 
   while (1) {
     /* Read until a new line. */
     res = 0;
-    int ret;
+    int32_t ret;
     do {
       ret = read(fd, global.result_buf + res, sizeof(global.result_buf) - res);
       res += ret;
@@ -851,7 +851,7 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
 
   switch (key) {
     case 65293: /* Enter. */
-      if (global.results && global.result_highlight < global.result_count && global.result_highlight >= 0) {
+      if (global.results && global.result_highlight < global.result_count) {
         printf("%s", global.results[global.result_highlight].action);
         goto cleanup;
       }
@@ -1092,7 +1092,7 @@ static int32_t get_multiscreen_settings(xcb_connection_t *connection, xcb_screen
         if (randr_output) { free(randr_output); }
         randr_output = xcb_randr_get_output_info_reply(connection, xcb_randr_get_output_info(connection, outputs[output_index], XCB_CURRENT_TIME), NULL);
         output_index++;
-      } while ((randr_output->connection != XCB_RANDR_CONNECTION_CONNECTED) && (output_index < num_outputs));
+      } while (randr_output && (randr_output->connection != XCB_RANDR_CONNECTION_CONNECTED) && (output_index < num_outputs));
       if (randr_output) {
         xcb_randr_get_crtc_info_reply_t *randr_crtc = xcb_randr_get_crtc_info_reply(connection, xcb_randr_get_crtc_info(connection, randr_output->crtc, XCB_CURRENT_TIME), NULL);
         if (!randr_crtc) {
