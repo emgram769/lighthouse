@@ -74,17 +74,22 @@ printed to standard out (and in the case above, into the shell).
 Syntax
 ---
 The syntax of a result is simple.
-`{ title | action }`
+`{ title | action }`or `{ title | action | description }`
 The `title` is displayed in the results and the `action` is written to standard out
 when that result is selected.  A common use case would therefore be
 `lighthouse | sh` and `action` would be some shell command.  Run `make config` and then
 `lighthouse | sh` to see this in action.  The `title` will be `look! [input]` and the
 `action` will be `[input]`, so you've effectively created a small one time shell prompt.
+The description is a text displayed according to the highlighted selection.
 To create multiple results simply chain them together: `{ title1 | action1 }{ title2 | action2 }`
 
-There is also image support in the form `{ %Ifile.png% <- an image! | feh file.png }`.
+* There is also image support in the form `{ %Ifile.png% <- an image! | feh file.png }`.
 To use `%` as a character, escape it with `\%`.
 Currently only PNG images are supported.
+
+* To go to the next line (in description window) use `%N`
+
+* To format your text in bold use `%B text... %`
 
 Other ways to use lighthouse
 ---
@@ -127,6 +132,8 @@ List of settings you can set in the configuration file:
 - `cmd`
 - `query_fg`, `query_bg`, `result_fg`, `result_bg`, `hightlight_fg`, `highlight_bg`
 - `dock_mode` (i3 users must set it to 0)
+- `desc_size` (size in pixel of the description window)
+- `auto_center`
 
 TODO
 ---
