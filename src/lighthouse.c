@@ -202,8 +202,9 @@ static struct {
   uint32_t dock_mode;
 
   /* Description option */
-  uint32_t desc_size;
-  uint32_t auto_center;
+  uint32_t desc_size; /* Size in pixel of the description window*/
+  uint32_t auto_center; /* Auto center the window when the description
+                         * is not expanded. */
 } settings;
 
 /* @brief Check the xcb cookie and prints an error if it has one.
@@ -234,6 +235,10 @@ static inline offset_t calculate_line_offset(uint32_t line) {
     result.y  = settings.height * line;
     result.image_y = result.y;
     result.y +=  + global.real_font_size;
+    /* To draw a picture cairo need to know the top left corner
+     * position. But to draw a text cairo need to know the bottom
+     * left corner position.
+     */
 
     return result;
 }
@@ -321,6 +326,14 @@ static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_
   return extents.x_advance;
 }
 
+/* @brief Resize an image.
+ *
+ * @param *surface The image to resize.
+ * @param width The width of the current image.
+ * @param height The height of the current image.
+ * @param new_width The width of the image when resized.
+ * @param new_height The height of the image when resized.
+ */
 cairo_surface_t * scale_surface (cairo_surface_t *surface, int width, int height,
         int new_width, int new_height) {
     cairo_surface_t *new_surface = cairo_surface_create_similar(surface,
@@ -375,6 +388,7 @@ static image_format_t draw_image(cairo_t *cr, const char *file, offset_t offset,
       /* Formatting only the big picture. */
       float prop = min((float)win_size_x / format.width,
               (float)win_size_y / format.height);
+      /* Finding the best proportion to fit the picture. */
       image_format_t new_format;
       new_format.width = prop * format.width;
       new_format.height = prop * format.height;
@@ -461,7 +475,7 @@ static draw_t parse_response_line(cairo_t *cr, char **c, uint32_t line_length) {
      */
     cairo_text_extents(cr, data, &extents);
     double base_line_length = extents.x_advance;
-    /* length of the line from the data variable position */
+    /* length of the line from the "data" variable position */
     if (base_line_length > line_length) {
         /* Checking if the text is long enough to exceed the line length
          * so we know if we have to check when the line is full.
@@ -471,6 +485,9 @@ static draw_t parse_response_line(cairo_t *cr, char **c, uint32_t line_length) {
             *c += 1;
             cairo_text_extents(cr, *c, &extents);
             if ((base_line_length - extents.x_advance) > line_length) {
+                /* base_line_length - extents.x_advance let us know the
+                 * length of the current line.
+                 */
                 *c -= 1;
                 if (*c == data)
                     data = NULL;

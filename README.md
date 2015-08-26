@@ -133,7 +133,8 @@ List of settings you can set in the configuration file:
 - `query_fg`, `query_bg`, `result_fg`, `result_bg`, `hightlight_fg`, `highlight_bg`
 - `dock_mode` (i3 users must set it to 0)
 - `desc_size` (size in pixel of the description window)
-- `auto_center`
+- `auto_center` (if set to 1, it center the window when the description is not
+  expanded)
 
 TODO
 ---
