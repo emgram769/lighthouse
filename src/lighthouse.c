@@ -118,6 +118,16 @@ typedef struct {
   char *data;
 } draw_t;
 
+/* @brief structure used to return the format of a picture.
+ * It's used because you sometime only need the width of a picture(for
+ * exemple if you draw a picture in a line, no need to go down), and sometime
+ * you need to know both (if you draw a picture in a description).
+ * */
+typedef struct {
+  int width;
+  int height;
+} image_format_t;
+
 /* @brief This struct is exclusively used to spawn a thread. */
 struct result_params {
   cairo_t *cr;
@@ -221,8 +231,9 @@ static inline int32_t check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_
 static inline offset_t calculate_line_offset(uint32_t line) {
     offset_t result;
     result.x  = settings.horiz_padding;
-    result.y  = settings.height * line + global.real_font_size;
-    result.image_y = settings.height * (line + 1);
+    result.y  = settings.height * line;
+    result.image_y = result.y;
+    result.y +=  + global.real_font_size;
 
     return result;
 }
@@ -333,11 +344,15 @@ cairo_surface_t * scale_surface (cairo_surface_t *surface, int width, int height
  *
  * @param cr A cairo context for drawing to the screen.
  * @param file The image to be drawn.
+ * @param
+ * @param
+ * @param
  * @return The advance in the x direction.
  */
-static uint32_t draw_image(cairo_t *cr, const char *file, offset_t offset) {
-  // TODO CHange parameter to know the size of the window.
+static image_format_t draw_image(cairo_t *cr, const char *file, offset_t offset, uint32_t win_size_x, uint32_t win_size_y) {
   wordexp_t expanded_file;
+  image_format_t format;
+
   if (wordexp(file, &expanded_file, 0)) {
     fprintf(stderr, "Error expanding file %s\n", file);
   } else {
@@ -346,30 +361,47 @@ static uint32_t draw_image(cairo_t *cr, const char *file, offset_t offset) {
 
   if (access(file, F_OK) == -1) {
     fprintf(stderr, "Cannot open image file %s\n", file);
-    return 0;
+    format.width = 0;
+    format.height = 0;
+    return format;
   }
 
   cairo_surface_t *img;
   img = cairo_image_surface_create_from_png(file);
-  int w = cairo_image_surface_get_width(img);
-  int h = cairo_image_surface_get_height(img);
-  int neww = (int)(((float)(settings.height) * ((float)(w) / (float)(h))) + 0.49999999);
-  img = scale_surface (img, w, h, neww, settings.height);
-  h = settings.height;
-  w = neww;
-  /* Attempt to center the image if it is not the height of the line. */
-  int image_offset = (h - settings.height) / 2;
-  cairo_set_source_surface(cr, img, offset.x, offset.image_y - h + image_offset);
-  cairo_mask_surface(cr, img, offset.x, offset.image_y - h + image_offset);
+  format.width = cairo_image_surface_get_width(img);
+  format.height = cairo_image_surface_get_height(img);
 
-  return w;
+  if (format.width > win_size_x || format.height > win_size_y) {
+      /* */
+      float prop = min((float)win_size_x / format.width,
+              (float)win_size_y / format.height);
+      image_format_t new_format;
+      new_format.width = prop * format.width;
+      new_format.height = prop * format.height;
+
+      img = scale_surface(img, format.width, format.height,
+              new_format.width, new_format.height);
+      format = new_format;
+      debug("Resizing the image to %ix%i (prop = %f)\n", format.width, format.height, prop);
+  }
+
+  /* Attempt to center the image if it is not the height of the line. */
+  // int image_offset = (h - settings.height) / 2;
+  //cairo_set_source_surface(cr, img, offset.x, offset.image_y - h + image_offset);
+  debug("Drawing the picture in x:%i, y:%i\n", offset.x, offset.image_y);
+  cairo_set_source_surface(cr, img, offset.x, offset.image_y);
+  //cairo_paint_with_alpha(cr, 0);
+  //cairo_mask_surface(cr, img, offset.x, offset.image_y - h + image_offset);
+  cairo_mask_surface(cr, img, offset.x, offset.image_y);
+
+  return format;
 }
 
 /* @brief Get character between % (function called from parse_response_line).
  * @param c A reference to the pointer to the current section
  * @param data A pointer to the data variable
  */
-void get_in(char **c, char **data) {
+static void get_in(char **c, char **data) {
     *c += 2;
     *data = *c;
     while (**c != '%') {
@@ -490,8 +522,10 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
     char saved = *c;
     *c = '\0';
     switch (d.type) {
-      case DRAW_IMAGE:
-        offset.x += draw_image(cr, d.data, offset) + settings.height / 10;
+      case DRAW_IMAGE: ;
+        image_format_t format;
+        format = draw_image(cr, d.data, offset, settings.width - offset.x, settings.height);
+        offset.x += format.width;
         break;
       case BOLD:
         offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_BOLD);
@@ -520,11 +554,12 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
 static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_t *background) {
   pthread_mutex_lock(&global.draw_mutex);
   cairo_set_source_rgb(cr, background->r, background->g, background->b);
+  uint32_t desc_height = settings.height*(global.result_count+1);
   cairo_rectangle(cr, settings.width, 0,
-          settings.width+settings.desc_size, settings.height*(global.result_count+1));
+          settings.width+settings.desc_size, desc_height);
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
-  offset_t offset = {settings.width, global.real_font_size, global.real_font_size};
+  offset_t offset = {settings.width, global.real_font_size, 0};
 
   /* Parse the response line as we draw it. */
   char *c = (char *)text;
@@ -533,12 +568,20 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
     char saved = *c;
     *c = '\0';
     switch (d.type) {
-      case DRAW_IMAGE:
-        offset.x += draw_image(cr, d.data, offset) + settings.height / 10;
+      case DRAW_IMAGE: ;
+        image_format_t format;
+        format = draw_image(cr, d.data, offset, settings.desc_size, desc_height - offset.image_y);
+        offset.image_y += format.height;
+        offset.y = offset.image_y;
+        offset.x += format.width;
+        /* We set the offset.y and x next to the picture so the user can choose to
+         * return to the next line or not.
+         */
         break;
       case NEW_LINE:
         offset.x = settings.width;
         offset.y += settings.font_size;
+        offset.image_y += settings.font_size;
         break;
       case BOLD:
         offset.x += draw_text(cr, d.data, offset, foreground, 1);
@@ -553,6 +596,7 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
         /* Checking if it's gonna write out of the square space. */
         offset.x = settings.width;
         offset.y += global.real_font_size;
+        offset.image_y += global.real_font_size;
     }
   }
 
