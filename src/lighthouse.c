@@ -124,8 +124,8 @@ typedef struct {
  * you need to know both (if you draw a picture in a description).
  * */
 typedef struct {
-  int width;
-  int height;
+  uint32_t width;
+  uint32_t height;
 } image_format_t;
 
 /* @brief This struct is exclusively used to spawn a thread. */
@@ -344,9 +344,9 @@ cairo_surface_t * scale_surface (cairo_surface_t *surface, int width, int height
  *
  * @param cr A cairo context for drawing to the screen.
  * @param file The image to be drawn.
- * @param
- * @param
- * @param
+ * @param Current offset in the line/desc, used to know the image position.
+ * @param win_size_x Width of the window.
+ * @param win_size_y Height of the window.
  * @return The advance in the x direction.
  */
 static image_format_t draw_image(cairo_t *cr, const char *file, offset_t offset, uint32_t win_size_x, uint32_t win_size_y) {
@@ -372,7 +372,7 @@ static image_format_t draw_image(cairo_t *cr, const char *file, offset_t offset,
   format.height = cairo_image_surface_get_height(img);
 
   if (format.width > win_size_x || format.height > win_size_y) {
-      /* */
+      /* Formatting only the big picture. */
       float prop = min((float)win_size_x / format.width,
               (float)win_size_y / format.height);
       image_format_t new_format;
@@ -385,13 +385,8 @@ static image_format_t draw_image(cairo_t *cr, const char *file, offset_t offset,
       debug("Resizing the image to %ix%i (prop = %f)\n", format.width, format.height, prop);
   }
 
-  /* Attempt to center the image if it is not the height of the line. */
-  // int image_offset = (h - settings.height) / 2;
-  //cairo_set_source_surface(cr, img, offset.x, offset.image_y - h + image_offset);
   debug("Drawing the picture in x:%i, y:%i\n", offset.x, offset.image_y);
   cairo_set_source_surface(cr, img, offset.x, offset.image_y);
-  //cairo_paint_with_alpha(cr, 0);
-  //cairo_mask_surface(cr, img, offset.x, offset.image_y - h + image_offset);
   cairo_mask_surface(cr, img, offset.x, offset.image_y);
 
   return format;
