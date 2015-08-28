@@ -518,7 +518,8 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
   pthread_mutex_lock(&global.draw_mutex);
 
   cairo_set_source_rgb(cr, background->r, background->g, background->b);
-  cairo_rectangle(cr, 0, line * settings.height, settings.width, (line + 1) * settings.height);
+  /* Add +2 offset to prevent flickery drawing over the typed text. TODO: Use better math all around. */
+  cairo_rectangle(cr, 0, line * settings.height + 2, settings.width, (line + 1) * settings.height);
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
   offset_t offset = calculate_line_offset(line);
