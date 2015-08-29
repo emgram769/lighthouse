@@ -1,5 +1,5 @@
-#ifndef __XCB_KEYSYMS_H__
-#define __XCB_KEYSYMS_H__
+#ifndef _XCB_KEYSYMS_H
+#define _XCB_KEYSYMS_H
 
 #include <xcb/xcb.h>
 
@@ -68,4 +68,4 @@ int xcb_is_modifier_key      (xcb_keysym_t keysym);
 #endif
 
 
-#endif /* __XCB_KEYSYMS_H__ */
+#endif /* _XCB_KEYSYMS_H */
