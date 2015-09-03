@@ -293,7 +293,6 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
          */
         break;
       case DRAW_LINE:
-        // cairo_set_line_width(cr, 1);
         offset.y += (settings.font_size / 2);
         offset.x = settings.width;
         cairo_set_source_rgb(cr, settings.result_bg.r, settings.result_bg.g, settings.result_bg.b);

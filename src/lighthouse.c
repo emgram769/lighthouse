@@ -690,6 +690,7 @@ int main(int argc, char **argv) {
   uint32_t query_cursor_index = 0;
 
   /* Now draw everything. */
+  cairo_set_line_width(cairo_context, 2);
   redraw_all(connection, window, cairo_context, cairo_surface, query_string, query_cursor_index);
 
   /* and center it */
