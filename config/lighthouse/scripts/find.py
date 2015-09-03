@@ -1,6 +1,5 @@
 #!/usr/bin/python2
 import subprocess
-import sys
 import os
 import mimetypes
 import argparse
