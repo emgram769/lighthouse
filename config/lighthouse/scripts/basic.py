@@ -10,7 +10,7 @@ def basic(sett):
                                            sett.user_input)
     if sett.show_in_shell:
         out += "{Run the command in a shell %%B'%s'%%|%s %s}" % (sett.user_input,
-                                                                 sett.terminal,
+                                                                 sett.term,
                                                                  sett.user_input
                                                                  )
     return out

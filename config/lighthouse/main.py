@@ -75,7 +75,6 @@ if __name__ == "__main__":
     processList = []
     manager = mp.Manager()
     subprocess_list = manager.list()
-    # results = mp.Array("c",  range(len(scripts)))
 
     while 1:
         request = sys.stdin.readline()[:-1]
@@ -88,7 +87,7 @@ if __name__ == "__main__":
         process_array = []
 
         for i, script in enumerate(commands):
-            cmd = '%s %s' % (script, request)
+            cmd = "%s '%s'" % (script, request)
             args = shlex.split(cmd)
             subprocess = sp.Popen(args, stdout=sp.PIPE)
             process_array.append(subprocess)
