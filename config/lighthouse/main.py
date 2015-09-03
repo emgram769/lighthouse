@@ -69,7 +69,7 @@ def make_commands(scripts_dict):
 if __name__ == "__main__":
     signal.signal(signal.SIGTERM, clean_subprocesses)
     subprocess_array = []
-    scripts_file = open("/home/thomas/.config/lighthouse/scripts.json")
+    scripts_file = open(os.path.expanduser("~/.config/lighthouse/scripts.json"))
     scripts = json.loads(scripts_file.read())
     commands = make_commands(scripts)
     processList = []
