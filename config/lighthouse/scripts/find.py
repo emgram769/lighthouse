@@ -5,12 +5,12 @@ import mimetypes
 import argparse
 
 
-def find(queryList, settings):
+def find(query, settings):
     """
     Little fuzzy finder implementation that work with a bash command,
     it also work different according to filetype.
     """
-    command = ["| grep %s " % (elem) for elem in queryList]
+    command = ["| grep %s " % (elem) for elem in query.split()]
     command = " ".join(command)
 
     user = os.path.expanduser('~')
