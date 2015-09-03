@@ -541,6 +541,13 @@ int main(int argc, char **argv) {
     goto cleanup;
   }
 
+	/* Override-redirect to inform a window manager not to tamper with the window. */
+	window_cookie = xcb_change_window_attributes(connection, window, XCB_CW_OVERRIDE_REDIRECT, values);
+  if (check_xcb_cookie(window_cookie, connection, "Failed to override window redirect.")) {
+    exit_code = 1;
+    goto cleanup;
+  }
+
   /* Get the atoms to create a dock window type. */
   xcb_atom_t window_type_atom, window_type_dock_atom;
   xcb_intern_atom_cookie_t atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_WINDOW_TYPE"), "_NET_WM_WINDOW_TYPE");
