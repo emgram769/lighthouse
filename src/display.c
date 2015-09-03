@@ -243,6 +243,8 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
       case DRAW_LINE:
       case NEW_LINE:
         break;
+      case CENTER:
+        offset.x += (settings.desc_size - d.data_length) / 2;
       case DRAW_TEXT:
       default:
         offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_NORMAL);
