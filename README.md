@@ -93,6 +93,8 @@ Currently only PNG images are supported.
 
 * To format your text in bold use `%B text... %`
 
+* To center a little portion of text %C text... %`
+
 Other ways to use lighthouse
 ---
 Because everything is handled through standard in and out, you can use pretty much any
