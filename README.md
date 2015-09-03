@@ -89,6 +89,8 @@ Currently only PNG images are supported.
 
 * To go to the next line (in description window) use `%N`
 
+* To draw a line in the description window (to separate it) `%L`
+
 * To format your text in bold use `%B text... %`
 
 Other ways to use lighthouse
@@ -135,6 +137,7 @@ List of settings you can set in the configuration file:
 - `desc_size` (size in pixel of the description window)
 - `auto_center` (if set to 1, it center the window when the description is not
   expanded)
+- `line_gap` (gap in the description window drawed with %N)
 
 TODO
 ---

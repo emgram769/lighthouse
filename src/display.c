@@ -1,6 +1,6 @@
 /** @file display.c
  *  @author Bram Wasti <bwasti@cmu.edu>
- *  
+ *
  *  @brief This file contains the logic that draws to the screen.
  */
 
@@ -240,6 +240,7 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
       case BOLD:
         offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_BOLD);
         break;
+      case DRAW_LINE:
       case NEW_LINE:
         break;
       case DRAW_TEXT:
@@ -287,6 +288,17 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
         /* We set the offset.y and x next to the picture so the user can choose to
          * return to the next line or not.
          */
+        break;
+      case DRAW_LINE:
+        // cairo_set_line_width(cr, 1);
+        offset.y += (settings.font_size / 2);
+        offset.x = settings.width;
+        cairo_set_source_rgb(cr, settings.result_bg.r, settings.result_bg.g, settings.result_bg.b);
+        cairo_move_to(cr, offset.x + settings.line_gap, offset.y);
+        cairo_line_to(cr, offset.x + settings.desc_size - settings.line_gap, offset.y);
+        cairo_stroke(cr);
+        offset.y += settings.font_size;
+        offset.image_y += settings.font_size;
         break;
       case NEW_LINE:
         offset.x = settings.width;

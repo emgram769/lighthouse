@@ -386,6 +386,7 @@ static int initialize_settings(char *config_file) {
   settings.dock_mode = 1;
   settings.desc_size = 300;
   settings.auto_center = 1;
+  settings.line_gap = 20;
 
   /* Read in from the config file. */
   wordexp_t expanded_file;

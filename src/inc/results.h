@@ -9,6 +9,7 @@ typedef enum {
   DRAW_TEXT,
   DRAW_IMAGE,
   BOLD,
+  DRAW_LINE,
   NEW_LINE
 } draw_type_t;
 

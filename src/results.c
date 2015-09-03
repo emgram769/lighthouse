@@ -1,6 +1,6 @@
 /** @file results.c
  *  @author Bram Wasti <bwasti@cmu.edu>
- *  
+ *
  *  @brief This file contains the logic that parses results.
  */
 
@@ -54,6 +54,10 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length) {
         break;
       case 'N':
         type = NEW_LINE;
+        *c += 2;
+        break;
+      case 'L':
+        type = DRAW_LINE;
         *c += 2;
         break;
       default:
