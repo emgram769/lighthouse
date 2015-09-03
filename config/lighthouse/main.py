@@ -11,7 +11,7 @@ import signal
 
 class LocationNotFoundError(Exception):
     def __init__(self, dict_struct=None):
-       print()
+        print("Location tag should be present in your scripts.json at " + dict_struct)
 
 
 def print_out(results):
