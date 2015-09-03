@@ -39,7 +39,7 @@ def find(queryList, settings):
                 # 'foo bar' is considered as a folder in python
                 # but 'foo\ bar' is not.
                 dirFile = " " + "%N ".join(os.listdir(str(find_array[i])))
-                res += "{%s|%s --working-directory=%s |%%BFile in directory:%%%%N%s}" % (str(find_array[i]), settings.term, clearedOut, dirFile)
+                res += "{%s|%s --working-directory=%s |%%BFile in directory:%%%%L%s}" % (str(find_array[i]), settings.term, clearedOut, dirFile)
             elif "png" in mime_type:
                 res += "{%s|xdg-open '%s'|%%I%s%%}" % (
                     str(find_array[i]), str(find_array[i]), clearedOut)
