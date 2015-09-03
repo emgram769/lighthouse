@@ -5,12 +5,12 @@ import mimetypes
 import argparse
 
 
-def find(queryList, settings):
+def find(query, settings):
     """
     Little fuzzy finder implementation that work with a bash command,
     it also work different according to filetype.
     """
-    command = ["| grep %s " % (elem) for elem in queryList]
+    command = ["| grep %s " % (elem) for elem in query.split()]
     command = " ".join(command)
 
     user = os.path.expanduser('~')
@@ -39,14 +39,14 @@ def find(queryList, settings):
                 # 'foo bar' is considered as a folder in python
                 # but 'foo\ bar' is not.
                 dirFile = " " + "%N ".join(os.listdir(str(find_array[i])))
-                res += "{%s|%s --working-directory=%s |%%BFile in directory:%%%%N%s}" % (str(find_array[i]), settings.term, clearedOut, dirFile)
+                res += "{%s|%s --working-directory=%s |%%CFile in directory%%%%L%s}" % (str(find_array[i]), settings.term, clearedOut, dirFile)
             elif "png" in mime_type:
                 res += "{%s|xdg-open '%s'|%%I%s%%}" % (
                     str(find_array[i]), str(find_array[i]), clearedOut)
 
             elif "text" in mime_type:
                 preview_file = open(clearedOut)
-                res += "{%s|xdg-open %s|%%BPreview:%%%%N%s}" % (str(find_array[i]), clearedOut, preview_file.read(100).replace("\n", "%N"))
+                res += "{%s|xdg-open %s|%%CPreview%%%%N%s}" % (str(find_array[i]), clearedOut, preview_file.read(100).replace("\n", "%N"))
                 preview_file.close()
 
             else:

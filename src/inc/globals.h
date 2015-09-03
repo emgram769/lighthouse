@@ -102,6 +102,7 @@ struct settings_s {
   uint32_t desc_size; /* Size in pixel of the description window*/
   uint32_t auto_center; /* Auto center the window when the description
                          * is not expanded. */
+  uint32_t line_gap; /* Gap between the line drawed by %L */
 };
 
 struct global_s global;
