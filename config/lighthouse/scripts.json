@@ -1,0 +1,15 @@
+[
+    {"location": "~/.config/lighthouse/scripts/find_xdg.py"},
+    {"location": "~/.config/lighthouse/scripts/find.py",
+     "term": "urvxt",
+     "number_of_output": 4
+    },
+    {"location": "~/.config/lighthouse/scripts/basic.py",
+     "show_execute": true,
+     "show_in_shell": true,
+     "term": "urvxt"
+    },
+    {"location": "~/.config/lighthouse/scripts/search.py",
+     "number_of_output": 3
+    }
+]
