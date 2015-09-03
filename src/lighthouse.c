@@ -463,7 +463,7 @@ int main(int argc, char **argv) {
   while ((c = getopt(argc, argv, "c:")) != -1) {
     switch (c) {
       case 'c':
-        config_file = optarg;
+        config_file = strdup(optarg);
         break;
       default:
         break;
