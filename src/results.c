@@ -40,6 +40,7 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length) {
 
   char *data = NULL;
   draw_type_t type = DRAW_TEXT;
+  uint32_t data_length = NULL;
 
   /* We've found a sequence of some kind. */
   if (**c == '%') {
@@ -47,6 +48,19 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length) {
       case 'I':
         type = DRAW_IMAGE;
         get_in(c, &data);
+        break;
+      case 'C':
+        type = CENTER;
+        get_in(c, &data);
+
+        cairo_text_extents_t extents;
+        /* http://cairographics.org/manual/cairo-cairo-scaled-font-t.html#cairo-text-extents-t
+        * For more information on cairo text extents.
+        */
+        cairo_text_extents(cr, data, &extents);
+        data_length = extents.x_advance;
+        cairo_text_extents(cr, *c, &extents);
+        data_length -= extents.x_advance;
         break;
       case 'B':
         type = BOLD;
@@ -83,9 +97,9 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length) {
      * For more information on cairo text extents.
      */
     cairo_text_extents(cr, data, &extents);
-    double base_line_length = extents.x_advance;
+    data_length = extents.x_advance;
     /* length of the line from the "data" variable position */
-    if (base_line_length > line_length) {
+    if (data_length > line_length) {
         /* Checking if the text is long enough to exceed the line length
          * so we know if we have to check when the line is full.
          */
@@ -93,8 +107,8 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length) {
                && !(**c == '\\' && *(*c + 1) == '%')) {
             *c += 1;
             cairo_text_extents(cr, *c, &extents);
-            if ((base_line_length - extents.x_advance) > line_length) {
-                /* base_line_length - extents.x_advance let us know the
+            if ((data_length - extents.x_advance) > line_length) {
+                /* data_length - extents.x_advance let us know the
                  * length of the current line.
                  */
                 *c -= 1;
@@ -111,7 +125,7 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length) {
     }
   }
 
-  return (draw_t){ type, data };
+  return (draw_t){ type, data, data_length };
 }
 
 /* @brief Parses text to populate a results structure.

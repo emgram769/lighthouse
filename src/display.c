@@ -306,11 +306,14 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
         offset.image_y += settings.font_size;
         break;
       case BOLD:
-        offset.x += draw_text(cr, d.data, offset, foreground, 1);
+        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_BOLD);
         break;
+      case CENTER:
+        if (d.data_length < settings.desc_size)
+            offset.x += (settings.desc_size - d.data_length) / 2;
       case DRAW_TEXT:
       default:
-        offset.x += draw_text(cr, d.data, offset, foreground, 0);
+        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_NORMAL);
         break;
     }
     *c = saved;

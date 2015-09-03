@@ -8,6 +8,7 @@
 typedef enum {
   DRAW_TEXT,
   DRAW_IMAGE,
+  CENTER,
   BOLD,
   DRAW_LINE,
   NEW_LINE
@@ -17,6 +18,7 @@ typedef enum {
 typedef struct {
   draw_type_t type;
   char *data;
+  uint32_t data_length; /* Not always filled */
 } draw_t;
 
 /* @brief Type used to maintain a list of results in a usable form. */
