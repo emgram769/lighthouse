@@ -131,6 +131,7 @@ uint32_t parse_result_text(char *text, size_t length, result_t **results) {
         case '{':
         case '|':
         case '}':
+        case '\\':
           memmove(&text[index], &(text[index+1]), length - index);
           break;
         default:
