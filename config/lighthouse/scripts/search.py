@@ -18,7 +18,7 @@ def searx(query, settings):
         title = results[i]["title"]
         url = results[i]["url"]
         content = results[i]["content"]
-        res.append("{%s|xdg-open %s|%s%%L%s}" % (title, url, url, content))
+        res.append("{%s|xdg-open %s|%%C%s%%%%L%s}" % (title, url, url, content))
 
     return res
 
