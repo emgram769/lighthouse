@@ -464,7 +464,7 @@ int main(int argc, char **argv) {
   while ((c = getopt(argc, argv, "c:")) != -1) {
     switch (c) {
       case 'c':
-        config_file = optarg;
+        config_file = strdup(optarg);
         break;
       default:
         break;
@@ -538,6 +538,13 @@ int main(int argc, char **argv) {
     XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK, values);
 
   if (check_xcb_cookie(window_cookie, connection, "Failed to initialize window.")) {
+    exit_code = 1;
+    goto cleanup;
+  }
+
+	/* Override-redirect to inform a window manager not to tamper with the window. */
+	window_cookie = xcb_change_window_attributes(connection, window, XCB_CW_OVERRIDE_REDIRECT, values);
+  if (check_xcb_cookie(window_cookie, connection, "Failed to override window redirect.")) {
     exit_code = 1;
     goto cleanup;
   }
