@@ -215,7 +215,8 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
   pthread_mutex_lock(&global.draw_mutex);
 
   cairo_set_source_rgb(cr, background->r, background->g, background->b);
-  /* Add +2 offset to prevent flickery drawing over the typed text. TODO: Use better math all around. */
+  /* Add 2 offset to height to prevent flickery drawing over the typed text.
+   * TODO: Use better math all around. */
   cairo_rectangle(cr, 0, line * settings.height + 2, settings.width, (line + 1) * settings.height);
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
@@ -265,11 +266,11 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
   pthread_mutex_lock(&global.draw_mutex);
   cairo_set_source_rgb(cr, background->r, background->g, background->b);
   uint32_t desc_height = settings.height*(global.result_count+1);
-  cairo_rectangle(cr, settings.width, 0,
+  cairo_rectangle(cr, settings.width + 2, 0,
           settings.width+settings.desc_size, desc_height);
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
-  offset_t offset = {settings.width, global.real_font_size, 0};
+  offset_t offset = {settings.width + 2, global.real_font_size, 0};
 
   /* Parse the result line as we draw it. */
   char *c = (char *)text;
@@ -343,7 +344,7 @@ void draw_result_text(xcb_connection_t *connection, xcb_window_t window, cairo_t
       uint32_t new_height = min(settings.height * (global.result_count + 1), settings.max_height);
       uint32_t values[] = { settings.width+settings.desc_size, new_height };
       xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
-      cairo_xcb_surface_set_size(surface, settings.width+settings.desc_size, new_height);
+      cairo_xcb_surface_set_size(surface, settings.width + settings.desc_size, new_height);
       draw_desc(cr, results[global.result_highlight].desc, &settings.highlight_fg, &settings.highlight_bg);
   } else {
       if (settings.auto_center) {
