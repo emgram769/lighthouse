@@ -20,7 +20,7 @@ def searx(query, settings):
         content = results[i]["content"]
         res.append("{%s|xdg-open %s|%%C%s%%%%L%s}" % (title, url, url, content))
 
-    return res
+    return ''.join(res)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
