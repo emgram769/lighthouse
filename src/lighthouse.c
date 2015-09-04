@@ -256,6 +256,10 @@ static void set_setting(char *param, char *val) {
     sscanf(val, "%u", &settings.desc_size);
   } else if (!strcmp("auto_center", param)) {
     sscanf(val, "%u", &settings.auto_center);
+  } else if (!strcmp("line_gap", param)) {
+    sscanf(val, "%u", &settings.line_gap);
+  } else if (!strcmp("desc_font_size", param)) {
+    sscanf(val, "%u", &settings.desc_font_size);
   }
 }
 
@@ -387,6 +391,7 @@ static int initialize_settings(char *config_file) {
   settings.desc_size = 300;
   settings.auto_center = 1;
   settings.line_gap = 20;
+  settings.desc_font_size = FONT_SIZE;
 
   /* Read in from the config file. */
   wordexp_t expanded_file;
@@ -657,6 +662,11 @@ int main(int argc, char **argv) {
   cairo_font_extents_t extents;
   cairo_font_extents(cairo_context, &extents);
   global.real_font_size = extents.height;
+
+  cairo_set_font_size(cairo_context, settings.desc_font_size);
+  cairo_font_extents(cairo_context, &extents);
+  global.real_desc_font_size = extents.height;
+  printf("%u to %f\n", settings.desc_font_size, global.real_desc_font_size);
 
   /* Spawn a thread to listen to our remote process. */
   if (pthread_mutex_init(&global.draw_mutex, NULL)) {

@@ -138,13 +138,13 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
  * @param foreground The color of the text.
  * @return The advance in the x direction.
  */
-static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_t *foreground, cairo_font_weight_t weight) {
+static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_t *foreground, cairo_font_weight_t weight, uint32_t font_size) {
   cairo_text_extents_t extents;
   cairo_text_extents(cr, text, &extents);
   cairo_move_to(cr, offset.x, offset.y);
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
   cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, weight);
-  cairo_set_font_size(cr, settings.font_size);
+  cairo_set_font_size(cr, font_size);
   cairo_show_text(cr, text);
   return extents.x_advance;
 }
@@ -277,7 +277,7 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
         offset.x += format.width;
         break;
       case BOLD:
-        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_BOLD);
+        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_BOLD, settings.font_size);
         break;
       case DRAW_LINE:
       case NEW_LINE:
@@ -286,7 +286,7 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
         offset.x += (settings.desc_size - d.data_length) / 2;
       case DRAW_TEXT:
       default:
-        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_NORMAL);
+        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_NORMAL, settings.font_size);
         break;
     }
     *c = saved;
@@ -311,7 +311,7 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
           settings.width+settings.desc_size, desc_height);
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
-  offset_t offset = {settings.width + 2, global.real_font_size, 0};
+  offset_t offset = {settings.width + 2, global.real_desc_font_size, 0};
 
   /* Parse the result line as we draw it. */
   char *c = (char *)text;
@@ -331,37 +331,37 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
          */
         break;
       case DRAW_LINE:
-        offset.y += (global.real_font_size / 2);
+        offset.y += (global.real_desc_font_size / 2);
         offset.x = settings.width;
         cairo_set_source_rgb(cr, settings.result_bg.r, settings.result_bg.g, settings.result_bg.b);
         cairo_move_to(cr, offset.x + settings.line_gap, offset.y);
         cairo_line_to(cr, offset.x + settings.desc_size - settings.line_gap, offset.y);
         cairo_stroke(cr);
-        offset.y += global.real_font_size;
-        offset.image_y += 2 * global.real_font_size;
+        offset.y += global.real_desc_font_size;
+        offset.image_y += 2 * global.real_desc_font_size;
         break;
       case NEW_LINE:
         offset.x = settings.width;
-        offset.y += settings.font_size;
-        offset.image_y += settings.font_size;
+        offset.y += global.real_desc_font_size;
+        offset.image_y += global.real_desc_font_size;
         break;
       case BOLD:
-        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_BOLD);
+        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_BOLD, settings.desc_font_size);
         break;
       case CENTER:
         if (d.data_length < settings.desc_size)
             offset.x += (settings.desc_size - d.data_length) / 2;
       case DRAW_TEXT:
       default:
-        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_NORMAL);
+        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_NORMAL, settings.desc_font_size);
         break;
     }
     *c = saved;
-    if ((offset.x + settings.font_size) > (settings.width + settings.desc_size)) {
+    if ((offset.x + settings.desc_font_size) > (settings.width + settings.desc_size)) {
         /* Checking if it's gonna write out of the square space. */
         offset.x = settings.width;
-        offset.y += global.real_font_size;
-        offset.image_y += global.real_font_size;
+        offset.y += global.real_desc_font_size;
+        offset.image_y += global.real_desc_font_size;
     }
   }
 

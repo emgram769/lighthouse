@@ -8,10 +8,13 @@ URL = "https://searx.me/?format=json&q="
 def searx(query, settings):
     """
     """
-    request = requests.request("GET", URL + query.replace(" ", "+"))
+    try:
+        request = requests.request("GET", URL + query.replace(" ", "+"))
 
-    results = json.loads(request.text)["results"]
-
+        results = json.loads(request.text)["results"]
+    except:
+        # If no connection or no query.
+        return ''
 
     res = []
     for i in range(min(len(results), settings.number_of_output)):
