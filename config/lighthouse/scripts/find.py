@@ -40,13 +40,13 @@ def find(query, settings):
                 # but 'foo\ bar' is not.
                 dirFile = " " + "%N ".join(os.listdir(str(find_array[i])))
                 res += "{%s|%s --working-directory=%s |%%CFile in directory%%%%L%s}" % (str(find_array[i]), settings.term, clearedOut, dirFile)
-            elif "png" in mime_type:
-                res += "{%s|xdg-open '%s'|%%I%s%%}" % (
+            elif mime_type and "image" in mime_type:
+                res += "{%s|xdg-open '%s'|%%CPreview%%%%L%%I%s%%}" % (
                     str(find_array[i]), str(find_array[i]), clearedOut)
 
-            elif "text" in mime_type:
+            elif mime_type and "text" in mime_type:
                 preview_file = open(clearedOut)
-                res += "{%s|xdg-open %s|%%CPreview%%%%N%s}" % (str(find_array[i]), clearedOut, preview_file.read(100).replace("\n", "%N"))
+                res += "{%s|xdg-open %s|%%CPreview%%%%L%s}" % (str(find_array[i]), clearedOut, preview_file.read(100).replace("\n", "%N"))
                 preview_file.close()
 
             else:
