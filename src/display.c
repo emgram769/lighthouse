@@ -149,8 +149,17 @@ static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_
   return extents.x_advance;
 }
 
-static image_format_t get_new_size(cairo_t *cr, uint32_t width, uint32_t height,
-        uint32_t win_size_x, uint32_t win_size_y) {
+/* @brief Return the new format for a picture to fit in a window.
+ *
+ * @param Current offset in the line/desc, used to know the image position.
+ * @param width Width of the picture.
+ * @param height Height of the picture.
+ * @param win_size_x Width of the window.
+ * @param win_size_y Height of the window.
+ *
+ * @return The advance in the x and y direction.
+ */
+static image_format_t get_new_size(uint32_t width, uint32_t height, uint32_t win_size_x, uint32_t win_size_y) {
   image_format_t new_format = { width, height };
   if (width > win_size_x || height > win_size_y) {
       /* Formatting only the big picture. */
@@ -172,17 +181,16 @@ static image_format_t get_new_size(cairo_t *cr, uint32_t width, uint32_t height,
  * @param Current offset in the line/desc, used to know the image position.
  * @param win_size_x Width of the window.
  * @param win_size_y Height of the window.
- * @param format a reference to a image_format_t.
  * @return The advance in the x direction.
  */
-static void draw_jpeg(cairo_t *cr, const char *file, offset_t offset, uint32_t win_size_x, uint32_t win_size_y, image_format_t *format) {
+static void draw_picture_with_gdk(cairo_t *cr, const char *file, offset_t offset, uint32_t win_size_x, uint32_t win_size_y, image_format_t *format) {
   GdkPixbuf *image;
   GError *error;
 
   image = gdk_pixbuf_new_from_file(file, &error);
 
   image_format_t new_form;
-  new_form = get_new_size(cr, gdk_pixbuf_get_width(image), gdk_pixbuf_get_height(image), win_size_x, win_size_y);
+  new_form = get_new_size(gdk_pixbuf_get_width(image), gdk_pixbuf_get_height(image), win_size_x, win_size_y);
   *format = new_form;
 
   /* Resizing */
@@ -190,34 +198,6 @@ static void draw_jpeg(cairo_t *cr, const char *file, offset_t offset, uint32_t w
 
   gdk_cairo_set_source_pixbuf(cr, resize, offset.x, offset.image_y);
   cairo_paint (cr);
-}
-
-/* @brief Draw a png at the given offset.
- *
- * @param cr A cairo context for drawing to the screen.
- * @param file The image to be drawn.
- * @param Current offset in the line/desc, used to know the image position.
- * @param win_size_x Width of the window.
- * @param win_size_y Height of the window.
- * @param format a reference to a image_format_t.
- * @return The advance in the x direction.
- */
-static void draw_png(cairo_t *cr, const char *file, offset_t offset, uint32_t win_size_x, uint32_t win_size_y, image_format_t *format) {
-  cairo_surface_t *img;
-  img = cairo_image_surface_create_from_png(file);
-  (*format).width = cairo_image_surface_get_width(img);
-  (*format).height = cairo_image_surface_get_height(img);
-
-  image_format_t new_format = get_new_size(cr, (*format).width, (*format).height, win_size_x, win_size_y);
-
-  img = scale_surface(img, (*format).width, (*format).height,
-          new_format.width, new_format.height);
-
-  *format = new_format;
-
-  debug("Drawing the picture in x:%i, y:%i\n", offset.x, offset.image_y);
-  cairo_set_source_surface(cr, img, offset.x, offset.image_y);
-  cairo_mask_surface(cr, img, offset.x, offset.image_y);
 }
 
 /* @brief Draw an image at the given offset.
@@ -231,7 +211,7 @@ static void draw_png(cairo_t *cr, const char *file, offset_t offset, uint32_t wi
  */
 static image_format_t draw_image(cairo_t *cr, const char *file, offset_t offset, uint32_t win_size_x, uint32_t win_size_y) {
   wordexp_t expanded_file;
-  image_format_t format;
+  image_format_t format = {0, 0};
 
   if (wordexp(file, &expanded_file, 0)) {
     fprintf(stderr, "Error expanding file %s\n", file);
@@ -250,13 +230,11 @@ static image_format_t draw_image(cairo_t *cr, const char *file, offset_t offset,
   switch (fgetc(picture)) {
     /* https://en.wikipedia.org/wiki/Magic_number_%28programming%29#Magic_numbers_in_files */
     case 137:
-        draw_png(cr, file, offset, win_size_x, win_size_y, &format);
-        break;
     case 255:
-        draw_jpeg(cr, file, offset, win_size_x, win_size_y, &format);
-        break;
+    case 47:
+        draw_image_with_gdk(cr, file, offset, win_size_x, win_size_y, &format);
     default:
-        printf("%i", fgetc(picture));
+        break;
   }
   fclose(picture);
   return format;
