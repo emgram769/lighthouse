@@ -123,6 +123,7 @@ running `make config`.
 List of settings you can set in the configuration file:
 - `font_name`
 - `font_size`
+- `desc_font_size`
 - `horiz_padding`
 - `cursor_padding`
 - `height`

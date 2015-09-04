@@ -50,6 +50,7 @@ struct global_s {
   uint32_t win_x_pos_with_desc;
   uint32_t win_y_pos;
   double real_font_size;
+  double real_desc_font_size;
 };
 
 /* @brief A struct of settings that are set and used when the program starts. */
@@ -102,6 +103,8 @@ struct settings_s {
   uint32_t desc_size; /* Size in pixel of the description window*/
   uint32_t auto_center; /* Auto center the window when the description
                          * is not expanded. */
+  uint32_t desc_font_size;
+
   uint32_t line_gap; /* Gap between the line drawed by %L */
 };
 
