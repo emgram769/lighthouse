@@ -183,7 +183,7 @@ static image_format_t get_new_size(uint32_t width, uint32_t height, uint32_t win
  * @param win_size_y Height of the window.
  * @return The advance in the x direction.
  */
-static void draw_picture_with_gdk(cairo_t *cr, const char *file, offset_t offset, uint32_t win_size_x, uint32_t win_size_y, image_format_t *format) {
+static void draw_image_with_gdk(cairo_t *cr, const char *file, offset_t offset, uint32_t win_size_x, uint32_t win_size_y, image_format_t *format) {
   GdkPixbuf *image;
   GError *error;
 
