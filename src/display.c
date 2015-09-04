@@ -149,6 +149,57 @@ static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_
   return extents.x_advance;
 }
 
+/* @brief Return the new format for a picture to fit in a window.
+ *
+ * @param Current offset in the line/desc, used to know the image position.
+ * @param width Width of the picture.
+ * @param height Height of the picture.
+ * @param win_size_x Width of the window.
+ * @param win_size_y Height of the window.
+ *
+ * @return The advance in the x and y direction.
+ */
+static image_format_t get_new_size(uint32_t width, uint32_t height, uint32_t win_size_x, uint32_t win_size_y) {
+  image_format_t new_format = { width, height };
+  if (width > win_size_x || height > win_size_y) {
+      /* Formatting only the big picture. */
+      float prop = min((float)win_size_x / width,
+              (float)win_size_y / height);
+      /* Finding the best proportion to fit the picture. */
+      new_format.width = prop * width;
+      new_format.height = prop * height;
+
+      debug("Resizing the image to %ix%i (prop = %f)\n", new_format.width, new_format.height, prop);
+  }
+  return new_format;
+}
+
+/* @brief Draw a png at the given offset.
+ *
+ * @param cr A cairo context for drawing to the screen.
+ * @param file The image to be drawn.
+ * @param Current offset in the line/desc, used to know the image position.
+ * @param win_size_x Width of the window.
+ * @param win_size_y Height of the window.
+ * @return The advance in the x direction.
+ */
+static void draw_picture_with_gdk(cairo_t *cr, const char *file, offset_t offset, uint32_t win_size_x, uint32_t win_size_y, image_format_t *format) {
+  GdkPixbuf *image;
+  GError *error;
+
+  image = gdk_pixbuf_new_from_file(file, &error);
+
+  image_format_t new_form;
+  new_form = get_new_size(gdk_pixbuf_get_width(image), gdk_pixbuf_get_height(image), win_size_x, win_size_y);
+  *format = new_form;
+
+  /* Resizing */
+  GdkPixbuf *resize =  gdk_pixbuf_scale_simple(image, new_form.width, new_form.height, GDK_INTERP_BILINEAR);
+
+  gdk_cairo_set_source_pixbuf(cr, resize, offset.x, offset.image_y);
+  cairo_paint (cr);
+}
+
 /* @brief Draw an image at the given offset.
  *
  * @param cr A cairo context for drawing to the screen.
@@ -160,7 +211,7 @@ static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_
  */
 static image_format_t draw_image(cairo_t *cr, const char *file, offset_t offset, uint32_t win_size_x, uint32_t win_size_y) {
   wordexp_t expanded_file;
-  image_format_t format;
+  image_format_t format = {0, 0};
 
   if (wordexp(file, &expanded_file, 0)) {
     fprintf(stderr, "Error expanding file %s\n", file);
@@ -175,30 +226,17 @@ static image_format_t draw_image(cairo_t *cr, const char *file, offset_t offset,
     return format;
   }
 
-  cairo_surface_t *img;
-  img = cairo_image_surface_create_from_png(file);
-  format.width = cairo_image_surface_get_width(img);
-  format.height = cairo_image_surface_get_height(img);
-
-  if (format.width > win_size_x || format.height > win_size_y) {
-      /* Formatting only the big picture. */
-      float prop = min((float)win_size_x / format.width,
-              (float)win_size_y / format.height);
-      /* Finding the best proportion to fit the picture. */
-      image_format_t new_format;
-      new_format.width = prop * format.width;
-      new_format.height = prop * format.height;
-
-      img = scale_surface(img, format.width, format.height,
-              new_format.width, new_format.height);
-      format = new_format;
-      debug("Resizing the image to %ix%i (prop = %f)\n", format.width, format.height, prop);
+  FILE *picture = fopen(file, "r");
+  switch (fgetc(picture)) {
+    /* https://en.wikipedia.org/wiki/Magic_number_%28programming%29#Magic_numbers_in_files */
+    case 137:
+    case 255:
+    case 47:
+        draw_image_with_gdk(cr, file, offset, win_size_x, win_size_y, &format);
+    default:
+        break;
   }
-
-  debug("Drawing the picture in x:%i, y:%i\n", offset.x, offset.image_y);
-  cairo_set_source_surface(cr, img, offset.x, offset.image_y);
-  cairo_mask_surface(cr, img, offset.x, offset.image_y);
-
+  fclose(picture);
   return format;
 }
 
