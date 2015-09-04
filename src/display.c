@@ -149,6 +149,22 @@ static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_
   return extents.x_advance;
 }
 
+static image_format_t get_new_size(cairo_t *cr, uint32_t width, uint32_t height,
+        uint32_t win_size_x, uint32_t win_size_y) {
+  image_format_t new_format = { width, height };
+  if (width > win_size_x || height > win_size_y) {
+      /* Formatting only the big picture. */
+      float prop = min((float)win_size_x / width,
+              (float)win_size_y / height);
+      /* Finding the best proportion to fit the picture. */
+      new_format.width = prop * width;
+      new_format.height = prop * height;
+
+      debug("Resizing the image to %ix%i (prop = %f)\n", new_format.width, new_format.height, prop);
+  }
+  return new_format;
+}
+
 /* @brief Draw a png at the given offset.
  *
  * @param cr A cairo context for drawing to the screen.
@@ -160,12 +176,20 @@ static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_
  * @return The advance in the x direction.
  */
 static void draw_jpeg(cairo_t *cr, const char *file, offset_t offset, uint32_t win_size_x, uint32_t win_size_y, image_format_t *format) {
-    GdkPixbuf *image;
-    GError *error;
+  GdkPixbuf *image;
+  GError *error;
 
-    image = gdk_pixbuf_new_from_file(file, &error);
-    gdk_cairo_set_source_pixbuf(cr, image, offset.x, offset.image_y);
-    cairo_paint (cr);
+  image = gdk_pixbuf_new_from_file(file, &error);
+
+  image_format_t new_form;
+  new_form = get_new_size(cr, gdk_pixbuf_get_width(image), gdk_pixbuf_get_height(image), win_size_x, win_size_y);
+  *format = new_form;
+
+  /* Resizing */
+  GdkPixbuf *resize =  gdk_pixbuf_scale_simple(image, new_form.width, new_form.height, GDK_INTERP_BILINEAR);
+
+  gdk_cairo_set_source_pixbuf(cr, resize, offset.x, offset.image_y);
+  cairo_paint (cr);
 }
 
 /* @brief Draw a png at the given offset.
@@ -184,20 +208,12 @@ static void draw_png(cairo_t *cr, const char *file, offset_t offset, uint32_t wi
   (*format).width = cairo_image_surface_get_width(img);
   (*format).height = cairo_image_surface_get_height(img);
 
-  if ((*format).width > win_size_x || (*format).height > win_size_y) {
-      /* Formatting only the big picture. */
-      float prop = min((float)win_size_x / (*format).width,
-              (float)win_size_y / (*format).height);
-      /* Finding the best proportion to fit the picture. */
-      image_format_t new_format;
-      new_format.width = prop * (*format).width;
-      new_format.height = prop * (*format).height;
+  image_format_t new_format = get_new_size(cr, (*format).width, (*format).height, win_size_x, win_size_y);
 
-      img = scale_surface(img, (*format).width, (*format).height,
-              new_format.width, new_format.height);
-      *format = new_format;
-      debug("Resizing the image to %ix%i (prop = %f)\n", (*format).width, (*format).height, prop);
-  }
+  img = scale_surface(img, (*format).width, (*format).height,
+          new_format.width, new_format.height);
+
+  *format = new_format;
 
   debug("Drawing the picture in x:%i, y:%i\n", offset.x, offset.image_y);
   cairo_set_source_surface(cr, img, offset.x, offset.image_y);
