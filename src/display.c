@@ -39,33 +39,6 @@ static inline offset_t calculate_line_offset(uint32_t line) {
   return result;
 }
 
-/* @brief Resize an image.
- *
- * @param *surface The image to resize.
- * @param width The width of the current image.
- * @param height The height of the current image.
- * @param new_width The width of the image when resized.
- * @param new_height The height of the image when resized.
- */
-cairo_surface_t * scale_surface (cairo_surface_t *surface, int width, int height,
-        int new_width, int new_height) {
-  cairo_surface_t *new_surface = cairo_surface_create_similar(surface,
-          CAIRO_CONTENT_COLOR_ALPHA, new_width, new_height);
-  cairo_t *cr = cairo_create (new_surface);
-
-  cairo_scale (cr, (double)new_width / width, (double)new_height / height);
-  cairo_set_source_surface (cr, surface, 0, 0);
-
-  cairo_pattern_set_extend (cairo_get_source(cr), CAIRO_EXTEND_REFLECT);
-  cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
-
-  cairo_paint (cr);
-
-  cairo_destroy (cr);
-
-  return new_surface;
-}
-
 /* @brief Draw a line of text with a cursor to a cairo context.
  *
  * @param cr A cairo context for drawing to the screen.
@@ -174,7 +147,7 @@ static image_format_t get_new_size(uint32_t width, uint32_t height, uint32_t win
   return new_format;
 }
 
-/* @brief Draw a png at the given offset.
+/* @brief Draw an image at the given offset.
  *
  * @param cr A cairo context for drawing to the screen.
  * @param file The image to be drawn.
@@ -381,11 +354,22 @@ void draw_result_text(xcb_connection_t *connection, xcb_window_t window, cairo_t
 
   uint32_t max_results = settings.max_height / settings.height - 1;
   uint32_t display_results = min(global.result_count, max_results);
-  if ((global.result_offset + display_results) < (global.result_highlight + 1)) {
-    global.result_offset = global.result_highlight - (display_results - 1);
-    display_results = global.result_count - global.result_offset;
+  /* Set the offset. */
+  if (global.result_count <= max_results) {
+      /* Sometime you use an offset from a previous query and then you send another query
+       * to your script but get only 2 response, you need to reset the offset to 0
+       */
+      global.result_offset = 0;
+  } else if (global.result_count - max_results < global.result_offset) {
+      /* When we need to adjust the offset. */
+      global.result_offset = global.result_count - max_results;
+  } else if ((global.result_offset + display_results) < (global.result_highlight + 1)) {
+      /* Change the offset to match the highlight when scrolling down. */
+      global.result_offset = global.result_highlight - (display_results - 1);
+      display_results = global.result_count - global.result_offset;
   } else if (global.result_offset > global.result_highlight) {
-    global.result_offset = global.result_highlight;
+      /* Used when scrolling up. */
+      global.result_offset = global.result_highlight;
   }
 
   if ((global.result_highlight < global.result_count) &&
@@ -413,7 +397,10 @@ void draw_result_text(xcb_connection_t *connection, xcb_window_t window, cairo_t
   }
 
   for (index = global.result_offset, line = 1; index < global.result_offset + display_results; index++, line++) {
-    if (index != global.result_highlight) {
+    if (!(results[index].action)) {
+      /* Title TODO */
+      draw_line(cr, results[index].text, line, &settings.result_fg, &settings.result_bg);
+    } else if (index != global.result_highlight) {
       draw_line(cr, results[index].text, line, &settings.result_fg, &settings.result_bg);
     } else {
       draw_line(cr, results[index].text, line, &settings.highlight_fg, &settings.highlight_bg);

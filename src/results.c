@@ -194,8 +194,13 @@ uint32_t parse_result_text(char *text, size_t length, result_t **results) {
         free(ret);
         return 0;
       }
+      if (mode == 1) {
+        /* if no action */
+        ret[count - 1].action = NULL;
+        ret[count - 1].desc = NULL;
+      }
       if (mode == 2) {
-        /* if no description was used in the user script. */
+        /* if no description */
         ret[count - 1].desc = NULL;
       }
       text[index] = 0;

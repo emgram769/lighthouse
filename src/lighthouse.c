@@ -107,7 +107,7 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
   /* Check when we should update. */
   int32_t redraw = 0;
   int32_t resend = 0;
-
+  uint32_t old_pos;
   debug("key: %u\n", key);
 
   switch (key) {
@@ -131,33 +131,80 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
       break;
     case 65362: /* Up. */
       if (global.result_highlight > 0) {
+        old_pos = global.result_highlight;
         global.result_highlight--;
+        while (global.result_highlight > 0 &&
+                !global.results[global.result_highlight].action) {
+            /* Searching for the previous result with an action.*/
+            global.result_highlight--;
+        }
+        if (!global.result_highlight) {
+            /* If no other result. */
+            if (global.result_offset)
+                global.result_offset--;
+            global.result_highlight = old_pos;
+        }
         draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
       }
       break;
     case 65364: /* Down. */
       if (global.result_count && global.result_highlight < global.result_count - 1) {
+        old_pos = global.result_highlight;
         global.result_highlight++;
+        while (global.result_highlight < global.result_count &&
+                !global.results[global.result_highlight].action) {
+            /* Searching for the next result with an action.*/
+            global.result_highlight++;
+        }
+        if (global.result_highlight == global.result_count) {
+            /* If no other result with an action can be found, it just inc the
+             * the offset so it can show the hidden title.
+             * NB: If the offset limit is exceed, it's handled by the draw_result_text function.
+             */
+            global.result_offset++;
+            global.result_highlight = old_pos;
+        }
         draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
+
       }
       break;
     case 65289: /* Tab. */
+      old_pos = global.result_highlight;
       if (global.result_count && global.result_highlight < global.result_count - 1) {
         global.result_highlight++;
-        draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
-      } else if(global.result_count && global.result_highlight == global.result_count - 1) {
+      } else if(global.result_count && global.result_highlight >= global.result_count - 1) {
+        global.result_offset = 0;
         global.result_highlight = 0;
-        draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
       }
+      if (!global.result_count)
+          break;
+      while (!(global.results[global.result_highlight].action) &&
+              global.result_highlight != old_pos) {
+            /* Searching for the next result with an action.*/
+           global.result_highlight++;
+           if(global.result_highlight == global.result_count - 1)
+               global.result_highlight = 0;
+      }
+
+      draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
       break;
     case 65056: /* Shift Tab */
+      old_pos = global.result_highlight;
       if (global.result_count && global.result_highlight > 0) {
         global.result_highlight--;
-        draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
-      } else if(global.result_count && global.result_highlight == 0) {
+      } else if(global.result_count && global.result_highlight >= 0) {
         global.result_highlight = global.result_count - 1;
-        draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
       }
+      if (!global.result_count)
+          break;
+      while (!global.results[global.result_highlight].action &&
+              global.result_highlight != old_pos) {
+            /* Searching for the previous result with an action.*/
+           if(global.result_highlight == 0)
+               global.result_highlight = global.result_count;
+           global.result_highlight--;
+      }
+      draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
       break;
     case 65307: /* Escape. */
       goto cleanup;
