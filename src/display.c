@@ -161,6 +161,10 @@ static void draw_image_with_gdk(cairo_t *cr, const char *file, offset_t offset, 
   GError *error;
 
   image = gdk_pixbuf_new_from_file(file, &error);
+  if (image == NULL) {
+      debug("Image opening failed (tried to open %s): %s\n", file, error->message);
+      return ;
+  }
 
   image_format_t new_form;
   new_form = get_new_size(gdk_pixbuf_get_width(image), gdk_pixbuf_get_height(image), win_size_x, win_size_y);
@@ -203,10 +207,19 @@ static image_format_t draw_image(cairo_t *cr, const char *file, offset_t offset,
   switch (fgetc(picture)) {
     /* https://en.wikipedia.org/wiki/Magic_number_%28programming%29#Magic_numbers_in_files */
     case 137:
-    case 255:
-    case 47:
+        debug("PNG found\n");
         draw_image_with_gdk(cr, file, offset, win_size_x, win_size_y, &format);
+        break;
+    case 255:
+        debug("JPEG found\n");
+        draw_image_with_gdk(cr, file, offset, win_size_x, win_size_y, &format);
+        break;
+    case 47:
+        debug("GIF found\n");
+        draw_image_with_gdk(cr, file, offset, win_size_x, win_size_y, &format);
+        break;
     default:
+        debug("Unknown image format found: %s\n", file);
         break;
   }
   fclose(picture);
@@ -398,7 +411,7 @@ void draw_result_text(xcb_connection_t *connection, xcb_window_t window, cairo_t
 
   for (index = global.result_offset, line = 1; index < global.result_offset + display_results; index++, line++) {
     if (!(results[index].action)) {
-      /* Title TODO */
+      /* Title */
       draw_line(cr, results[index].text, line, &settings.result_fg, &settings.result_bg);
     } else if (index != global.result_highlight) {
       draw_line(cr, results[index].text, line, &settings.result_fg, &settings.result_bg);
