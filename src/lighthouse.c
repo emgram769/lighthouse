@@ -84,6 +84,39 @@ static inline int32_t check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_
   return 0;
 }
 
+/* @brief Return number of modifiers present in mask
+ *    0: "Nothing"
+ *    1: "Shift"
+ *    2: "Lock"
+ *    3: "Ctrl"
+ *    4: "Alt",
+ *    5: "Mod2"
+ *    6: "Mod3"
+ *    7: "Mod4"
+ *    8: "Mod5",
+ *    9: "Button1"
+ *    10: "Button2"
+ *    11: "Button3"
+ *    12: "Button4"
+ *    13: "Button5"
+ *    (http://xcb.freedesktop.org/tutorial/events/)
+ *
+ * @param mask Modifier mask return by
+ *      xcb_key_release_event_t k ... ->event;
+ * */
+uint8_t get_modifiers (uint32_t mask) {
+    uint8_t modifier = 0;
+    if (mask) {
+        ++modifier;
+        while (!(mask & 1)) {
+            mask >>= 1;
+            ++modifier;
+        }
+    }
+    return modifier;
+}
+
+
 /* @brief Set the param "highlight" on the next line by passing all
  *        the title line (with no action).
  *
@@ -165,18 +198,20 @@ static void get_previous_line(uint32_t *highlight) {
  * @param to_write A descriptor to write to the child process.
  * @return 0 on success and 1 on failure.
  */
-static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer, uint32_t *query_index, uint32_t *query_cursor_index, xcb_keysym_t key, uint16_t modifier, xcb_connection_t *connection, cairo_t *cairo_context, cairo_surface_t *cairo_surface, FILE *to_write) {
+static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer, uint32_t *query_index, uint32_t *query_cursor_index, xcb_keysym_t key, uint16_t modifier_mask, xcb_connection_t *connection, cairo_t *cairo_context, cairo_surface_t *cairo_surface, FILE *to_write) {
   pthread_mutex_lock(&global.result_mutex);
 
   /* Check when we should update. */
   int32_t redraw = 0;
   int32_t resend = 0;
 
-  debug("key: %u, modifier: %u\n", key, modifier);
+  uint8_t mod_key = get_modifiers(modifier_mask);
+
+  debug("key: %u, modifier: %u\n", key, mod_key);
 
   uint32_t highlight = global.result_highlight;
   //if (!global.result_count) {
-  if (key == 100 && modifier == 4) {
+  if (key == 100 && mod_key == 3) {
       /* CTRL-D
        * GO down to the next title
        */
@@ -192,7 +227,7 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
       }
       get_next_line(&highlight);
       draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
-  } else if (key == 117 && modifier == 4) {
+  } else if (key == 117 && mod_key == 3) {
       /* CTRL-U
        * GO up to the next title
        */
