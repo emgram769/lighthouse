@@ -7,7 +7,7 @@ CFLAGS+=-I$(INCDIR)
 SRCS=$(wildcard $(SRCDIR)/*.c)
 OBJS=$(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
 
-CFLAGS+=-O2 -Wall -std=c99 `pkg-config --cflags --libs gtk+-3.0`
+CFLAGS+=-O2 -Wall -std=c99 `pkg-config --cflags --libs gdk-2.0`
 CFLAGS_DEBUG+=-O0 -g3 -Werror -DDEBUG -pedantic
 LDFLAGS+=-lxcb -lxcb-xkb -lxcb-xinerama -lxcb-randr -lcairo -lpthread
 
