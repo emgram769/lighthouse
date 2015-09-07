@@ -84,6 +84,68 @@ static inline int32_t check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_
   return 0;
 }
 
+/* @brief Set the param "highlight" on the next line by passing all
+ *        the title line (with no action).
+ *
+ * @param Copy of the global.result_highlight for the ease of use.
+ */
+static void get_next_non_title(uint32_t *highlight) {
+    (*highlight)++;
+    while ((*highlight) < global.result_count && !global.results[*highlight].action) {
+        /* Searching for the next result with an action.*/
+        (*highlight)++;
+    }
+}
+
+/* @brief Set the global.result_highlight on the next line
+ *        that can be clicked (contain an action), and take care of
+ *        the bottom of the window.
+ *
+ * @param Copy of the global.result_highlight for the ease of use.
+ */
+static void get_next_line(uint32_t *highlight) {
+      get_next_non_title(highlight);
+      if(global.results[*highlight].action &&
+              *highlight == global.result_count) {
+          /* If the last result is a title go on the top. */
+          *highlight = 0;
+          global.result_offset = 0;
+          get_next_non_title(highlight);
+      }
+      global.result_highlight = *highlight;
+}
+
+/* @brief Set the param "highlight" on the previous line by passing all
+ *        the title line (with no action).
+ *
+ * @param Copy of the global.result_highlight for the ease of use.
+ */
+static void get_previous_non_title(uint32_t *highlight) {
+    (*highlight)--;
+    while ((*highlight) > 0 && !global.results[*highlight].action) {
+        /* Searching for the previous result with an action.*/
+        (*highlight)--;
+    }
+}
+
+/* @brief Set the global.result_highlight on the previous line
+ *        that can be clicked (contain an action), and take care of
+ *        the top of the window.
+ *
+ * @param Copy of the global.result_highlight for the ease of use.
+ */
+static void get_previous_line(uint32_t *highlight) {
+    if (*highlight) {
+        get_previous_non_title(highlight);
+    }
+    if(!*highlight) {
+        *highlight = global.result_count;
+        get_previous_non_title(highlight);
+    }
+    global.result_highlight = *highlight;
+}
+
+
 /* @brief Processes an entered key by:
  *
  * 1) Adding the key to the query buffer (backspace will remove a character).
@@ -101,15 +163,51 @@ static inline int32_t check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_
  * @param to_write A descriptor to write to the child process.
  * @return 0 on success and 1 on failure.
  */
-static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer, uint32_t *query_index, uint32_t *query_cursor_index, xcb_keysym_t key, xcb_connection_t *connection, cairo_t *cairo_context, cairo_surface_t *cairo_surface, FILE *to_write) {
+static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer, uint32_t *query_index, uint32_t *query_cursor_index, xcb_keysym_t key, uint16_t modifier, xcb_connection_t *connection, cairo_t *cairo_context, cairo_surface_t *cairo_surface, FILE *to_write) {
   pthread_mutex_lock(&global.result_mutex);
 
   /* Check when we should update. */
   int32_t redraw = 0;
   int32_t resend = 0;
-  uint32_t old_pos;
-  debug("key: %u\n", key);
 
+  debug("key: %u, modifier: %u\n", key, modifier);
+
+  uint32_t highlight = global.result_highlight;
+  //if (!global.result_count) {
+  if (key == 100 && modifier == 4) {
+      /* CTRL-D
+       * GO down to the next title
+       */
+      while (highlight < global.result_count && global.results[highlight].action) {
+          highlight++;
+      }
+      if (highlight == global.result_count) {
+        /* highlight hit the bottom. */
+        highlight = 0;
+        while (highlight < global.result_count - 1 && global.results[highlight].action) {
+            highlight++;
+        }
+      }
+      get_next_line(&highlight);
+      draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
+  } else if (key == 117 && modifier == 4) {
+      /* CTRL-U
+       * GO up to the next title
+       */
+      while (highlight > 0 && global.results[highlight].action) {
+          highlight--;
+      }
+
+      if (highlight == 0 && global.results[highlight].action) {
+        /* highlight hit the top . */
+        highlight = global.result_count - 1;
+        while (highlight > 0 && global.results[highlight].action) {
+            highlight--;
+        }
+      }
+      get_previous_line(&highlight);
+      draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
+  } else {
   switch (key) {
     case 65293: /* Enter. */
       if (global.results && global.result_highlight < global.result_count) {
@@ -130,80 +228,37 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
       }
       break;
     case 65362: /* Up. */
-      if (global.result_highlight > 0) {
-        old_pos = global.result_highlight;
-        global.result_highlight--;
-        while (global.result_highlight > 0 &&
-                !global.results[global.result_highlight].action) {
-            /* Searching for the previous result with an action.*/
-            global.result_highlight--;
-        }
-        if (!global.result_highlight) {
+      if (highlight > 0) {
+        get_previous_non_title(&highlight);
+        if (!highlight) {
             /* If no other result. */
             if (global.result_offset)
                 global.result_offset--;
-            global.result_highlight = old_pos;
         }
+        global.result_highlight = highlight;
         draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
       }
       break;
     case 65364: /* Down. */
-      if (global.result_count && global.result_highlight < global.result_count - 1) {
-        old_pos = global.result_highlight;
-        global.result_highlight++;
-        while (global.result_highlight < global.result_count &&
-                !global.results[global.result_highlight].action) {
-            /* Searching for the next result with an action.*/
-            global.result_highlight++;
-        }
-        if (global.result_highlight == global.result_count) {
+      if (global.result_count && highlight < global.result_count - 1) {
+        get_next_non_title(&highlight);
+        if (highlight == global.result_count) {
             /* If no other result with an action can be found, it just inc the
              * the offset so it can show the hidden title.
              * NB: If the offset limit is exceed, it's handled by the draw_result_text function.
              */
             global.result_offset++;
-            global.result_highlight = old_pos;
         }
+        global.result_highlight = highlight;
         draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
-
       }
       break;
     case 65289: /* Tab. */
-      old_pos = global.result_highlight;
-      if (global.result_count && global.result_highlight < global.result_count - 1) {
-        global.result_highlight++;
-      } else if(global.result_count && global.result_highlight >= global.result_count - 1) {
-        global.result_offset = 0;
-        global.result_highlight = 0;
-      }
-      if (!global.result_count)
-          break;
-      while (!(global.results[global.result_highlight].action) &&
-              global.result_highlight != old_pos) {
-            /* Searching for the next result with an action.*/
-           global.result_highlight++;
-           if(global.result_highlight == global.result_count - 1)
-               global.result_highlight = 0;
-      }
-
+      get_next_line(&highlight);
       draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
       break;
     case 65056: /* Shift Tab */
-      old_pos = global.result_highlight;
-      if (global.result_count && global.result_highlight > 0) {
-        global.result_highlight--;
-      } else if(global.result_count && global.result_highlight >= 0) {
-        global.result_highlight = global.result_count - 1;
-      }
-      if (!global.result_count)
-          break;
-      while (!global.results[global.result_highlight].action &&
-              global.result_highlight != old_pos) {
-            /* Searching for the previous result with an action.*/
-           if(global.result_highlight == 0)
-               global.result_highlight = global.result_count;
-           global.result_highlight--;
-      }
+      get_previous_line(&highlight);
       draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
       break;
     case 65307: /* Escape. */
@@ -229,6 +284,7 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
         resend = 1;
       }
       break;
+  }
   }
 
   if (redraw) {
@@ -784,8 +840,8 @@ int main(int argc, char **argv) {
       }
       case XCB_KEY_RELEASE: {
         xcb_key_release_event_t *k = (xcb_key_release_event_t *)event;
-        xcb_keysym_t key = xcb_key_press_lookup_keysym(keysyms, k, k->state & ~XCB_MOD_MASK_2);
-        int32_t ret = process_key_stroke(window, query_string, &query_index, &query_cursor_index, key, connection, cairo_context, cairo_surface, to_child);
+        xcb_keysym_t key = xcb_key_press_lookup_keysym(keysyms, k, k->state & ~XCB_MOD_MASK_2 & ~XCB_MOD_MASK_CONTROL);
+        int32_t ret = process_key_stroke(window, query_string, &query_index, &query_cursor_index, key, k->state, connection, cairo_context, cairo_surface, to_child);
         if (ret <= 0) {
           exit_code = ret;
           goto cleanup;
