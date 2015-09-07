@@ -11,14 +11,14 @@ import signal
 
 class LocationNotFoundError(Exception):
     def __init__(self, dict_struct=None):
-        print("Location tag should be present in your scripts.json at " + dict_struct)
+       print()
 
 
 def print_out(results):
     print("".join([x if x is not None else "" for x in results]))
 
 
-def clean_subprocesses(processList, subprocess_list):
+def clean_subprocesses(processList, subprocess_list, _exit=0):
     """
     Stop all processes started.
     """
@@ -28,6 +28,8 @@ def clean_subprocesses(processList, subprocess_list):
     for p in subprocess_list:
         p.terminate()
         del p
+    if _exit:
+        exit()
 
 
 def get_result(subprocess, results_array, i):
@@ -67,7 +69,6 @@ def make_commands(scripts_dict):
 
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGTERM, clean_subprocesses)
     subprocess_array = []
     scripts_file = open(os.path.expanduser("~/.config/lighthouse/scripts.json"))
     scripts = json.loads(scripts_file.read())
@@ -75,13 +76,17 @@ if __name__ == "__main__":
     processList = []
     manager = mp.Manager()
     subprocess_list = manager.list()
+    signal.signal(signal.SIGTERM, lambda x, y: clean_subprocesses(processList, subprocess_list, 1))
 
     while 1:
         request = sys.stdin.readline()[:-1]
-
         clean_subprocesses(processList, subprocess_list)
         processList = []
         subprocess_list = manager.list()
+
+        if len(request.strip()) == 0:
+            print('')
+            continue
 
         results_array = manager.list([None for x in range(len(scripts))])
         process_array = []
