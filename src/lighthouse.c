@@ -104,6 +104,8 @@ static void get_next_non_title(uint32_t *highlight) {
  * @param Copy of the global.result_highlight for the ease of use.
  */
 static void get_next_line(uint32_t *highlight) {
+      if (!*highlight)
+          global.result_offset = 0;
       get_next_non_title(highlight);
       if(global.results[*highlight].action &&
               *highlight == global.result_count) {
