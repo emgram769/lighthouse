@@ -137,8 +137,6 @@ static void get_next_non_title(uint32_t *highlight) {
  * @param Copy of the global.result_highlight for the ease of use.
  */
 static void get_next_line(uint32_t *highlight) {
-      if (!*highlight)
-          global.result_offset = 0;
       get_next_non_title(highlight);
       if(global.results[*highlight].action &&
               *highlight == global.result_count) {
@@ -170,9 +168,9 @@ static void get_previous_non_title(uint32_t *highlight) {
  * @param Copy of the global.result_highlight for the ease of use.
  */
 static void get_previous_line(uint32_t *highlight) {
-    if (*highlight) {
+    if (*highlight)
         get_previous_non_title(highlight);
-    }
+
     if(!*highlight) {
         *highlight = global.result_count;
         get_previous_non_title(highlight);
@@ -221,6 +219,7 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
       if (highlight == global.result_count) {
         /* highlight hit the bottom. */
         highlight = 0;
+        global.result_offset = 0;
         while (highlight < global.result_count - 1 && global.results[highlight].action) {
             highlight++;
         }
