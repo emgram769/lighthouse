@@ -7,7 +7,7 @@ CFLAGS+=-I$(INCDIR)
 SRCS=$(wildcard $(SRCDIR)/*.c)
 OBJS=$(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
 
-CFLAGS+=-O2 -Wall -std=c99 `pkg-config --cflags --libs gtk+-3.0`
+CFLAGS+=-O2 -Wall -std=c99
 CFLAGS_DEBUG+=-O0 -g3 -Werror -DDEBUG -pedantic
 LDFLAGS+=-lxcb -lxcb-xkb -lxcb-xinerama -lxcb-randr -lcairo -lpthread
 
@@ -16,6 +16,15 @@ platform=$(shell uname)
 ifeq ($(platform),Darwin)
 	CFLAGS+=-I/usr/X11/include
 	LDFLAGS+=-L/usr/X11/lib
+endif
+
+# Library specific
+HAS_GDK=`pkg-config --exists gtk+-3.0 && echo $?`
+ifeq ($(HAS_GDK),0)
+	CFLAGS+=`pkg-config --cflags gtk+-3.0`
+	LDFLAGS+=`pkg-config --libs gtk+-3.0`
+else
+	CFLAGS+=-DNO_GDK
 endif
 
 all: lighthouse

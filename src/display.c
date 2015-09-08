@@ -149,6 +149,7 @@ static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_
   return extents.x_advance;
 }
 
+#ifndef NO_GDK
 /* @brief Return the new format for a picture to fit in a window.
  *
  * @param Current offset in the line/desc, used to know the image position.
@@ -199,6 +200,7 @@ static void draw_image_with_gdk(cairo_t *cr, const char *file, offset_t offset, 
   gdk_cairo_set_source_pixbuf(cr, resize, offset.x, offset.image_y);
   cairo_paint (cr);
 }
+#endif
 
 /* @brief Draw an image at the given offset.
  *
@@ -232,7 +234,9 @@ static image_format_t draw_image(cairo_t *cr, const char *file, offset_t offset,
     case 137:
     case 255:
     case 47:
+#ifndef NO_GDK
         draw_image_with_gdk(cr, file, offset, win_size_x, win_size_y, &format);
+#endif
     default:
         break;
   }

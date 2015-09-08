@@ -6,9 +6,11 @@
 #include <xcb/randr.h>
 #include <xcb/xcb.h>
 #include <xcb/xinerama.h>
+#ifndef NO_GDK
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #include <gdk/gdk.h>
 #include <glib.h>
+#endif
 
 #include "results.h"
 
