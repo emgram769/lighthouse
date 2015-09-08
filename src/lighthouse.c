@@ -210,8 +210,8 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
   debug("key: %u, modifier: %u\n", key, mod_key);
 
   uint32_t highlight = global.result_highlight;
-  //if (!global.result_count) {
-  if (key == 100 && mod_key == 3) {
+  uint32_t old_pos;
+  if (global.result_count && key == 100 && mod_key == 3) {
       /* CTRL-D
        * GO down to the next title
        */
@@ -227,7 +227,7 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
       }
       get_next_line(&highlight);
       draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
-  } else if (key == 117 && mod_key == 3) {
+  } else if (global.result_count && key == 117 && mod_key == 3) {
       /* CTRL-U
        * GO up to the next title
        */
@@ -265,10 +265,16 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
       }
       break;
     case 65362: /* Up. */
-      if (highlight > 0) {
+      if (!global.result_count)
+          break;
+      if (highlight) { /* Avoid segfault when highlight on the top. */
+        old_pos = highlight;
         get_previous_non_title(&highlight);
-        if (!highlight) {
-            /* If no other result. */
+        if (!global.results[highlight].action) {
+            /* If it's a title it mean the get_previous_non_title function
+            * found nothing and hit the top.
+            */
+            highlight = old_pos; /* To not let the highlight point on a title. */
             if (global.result_offset)
                 global.result_offset--;
         }
@@ -277,24 +283,33 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
       }
       break;
     case 65364: /* Down. */
-      if (global.result_count && highlight < global.result_count - 1) {
-        get_next_non_title(&highlight);
-        if (highlight == global.result_count) {
-            /* If no other result with an action can be found, it just inc the
-             * the offset so it can show the hidden title.
-             * NB: If the offset limit is exceed, it's handled by the draw_result_text function.
-             */
+      if (!global.result_count)
+          break;
+      if (highlight < global.result_count - 1) {
+       old_pos = highlight;
+       get_next_non_title(&highlight);
+       if (highlight == global.result_count) {
+           /* If no other result with an action can be found, it just inc the
+            * the offset so it can show the hidden title and make the highlight to the
+            * previous non_title.
+            * NB: If the offset limit is exceed, it's handled by the draw_result_text function.
+            */
+            highlight = old_pos;
             global.result_offset++;
-        }
-        global.result_highlight = highlight;
-        draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
+       }
+       global.result_highlight = highlight;
+       draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
       }
       break;
     case 65289: /* Tab. */
+      if (!global.result_count)
+          break;
       get_next_line(&highlight);
       draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
       break;
     case 65056: /* Shift Tab */
+      if (!global.result_count)
+          break;
       get_previous_line(&highlight);
       draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
       break;
@@ -302,23 +317,23 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
       goto cleanup;
     case 65288: /* Backspace. */
       if (*query_index > 0 && *query_cursor_index > 0) {
-        memmove(&query_buffer[(*query_cursor_index) - 1], &query_buffer[*query_cursor_index], *query_index - *query_cursor_index + 1);
-        (*query_cursor_index)--;
-        (*query_index)--;
-        query_buffer[(*query_index)] = 0;
-        redraw = 1;
-        resend = 1;
+          memmove(&query_buffer[(*query_cursor_index) - 1], &query_buffer[*query_cursor_index], *query_index - *query_cursor_index + 1);
+          (*query_cursor_index)--;
+          (*query_index)--;
+          query_buffer[(*query_index)] = 0;
+          redraw = 1;
+          resend = 1;
       } else if (*query_index == 0 && settings.backspace_exit) { /* Backspace with nothing */
-        goto cleanup;
+          goto cleanup;
       }
       break;
     default:
       if (isprint((char)key) && *query_index < MAX_QUERY) {
-        memmove(&query_buffer[(*query_cursor_index) + 1], &query_buffer[*query_cursor_index], *query_index - *query_cursor_index + 1);
-        query_buffer[(*query_cursor_index)++] = key;
-        (*query_index)++;
-        redraw = 1;
-        resend = 1;
+          memmove(&query_buffer[(*query_cursor_index) + 1], &query_buffer[*query_cursor_index], *query_index - *query_cursor_index + 1);
+          query_buffer[(*query_cursor_index)++] = key;
+          (*query_index)++;
+          redraw = 1;
+          resend = 1;
       }
       break;
   }
@@ -869,7 +884,6 @@ int main(int argc, char **argv) {
 
         /* Redraw. */
         redraw_all(connection, window, cairo_context, cairo_surface, query_string, query_cursor_index);
-
         break;
       }
       case XCB_KEY_PRESS: {
