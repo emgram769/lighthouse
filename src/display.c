@@ -158,11 +158,12 @@ static image_format_t get_new_size(uint32_t width, uint32_t height, uint32_t win
  */
 static void draw_image_with_gdk(cairo_t *cr, const char *file, offset_t offset, uint32_t win_size_x, uint32_t win_size_y, image_format_t *format) {
   GdkPixbuf *image;
-  GError *error;
+  GError *error = NULL;
 
   image = gdk_pixbuf_new_from_file(file, &error);
   if (image == NULL) {
       debug("Image opening failed (tried to open %s): %s\n", file, error->message);
+      g_error_free(error);
       return ;
   }
 
