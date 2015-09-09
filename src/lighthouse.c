@@ -141,7 +141,7 @@ static void get_next_line(uint32_t *highlight) {
       if(global.results[*highlight].action &&
               *highlight == global.result_count) {
           /* If the last result is a title go on the top. */
-          *highlight = 0;
+          *highlight = -1;
           global.result_offset = 0;
           get_next_non_title(highlight);
       }
@@ -155,7 +155,7 @@ static void get_next_line(uint32_t *highlight) {
  */
 static void get_previous_non_title(uint32_t *highlight) {
     (*highlight)--;
-    while ((*highlight) > 0 && !global.results[*highlight].action) {
+    while ((*highlight) > (uint32_t) -1 && !global.results[*highlight].action) {
         /* Searching for the previous result with an action.*/
         (*highlight)--;
     }
@@ -168,10 +168,9 @@ static void get_previous_non_title(uint32_t *highlight) {
  * @param Copy of the global.result_highlight for the ease of use.
  */
 static void get_previous_line(uint32_t *highlight) {
-    if (*highlight)
-        get_previous_non_title(highlight);
+    get_previous_non_title(highlight);
 
-    if(!*highlight) {
+    if(*highlight == (uint32_t) -1) {
         *highlight = global.result_count;
         get_previous_non_title(highlight);
     }
