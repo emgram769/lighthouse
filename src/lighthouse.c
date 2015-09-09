@@ -666,7 +666,7 @@ int main(int argc, char **argv) {
   cairo_set_font_size(cairo_context, settings.desc_font_size);
   cairo_font_extents(cairo_context, &extents);
   global.real_desc_font_size = extents.height;
-  printf("%u to %f\n", settings.desc_font_size, global.real_desc_font_size);
+  debug("%u to %f\n", settings.desc_font_size, global.real_desc_font_size);
 
   /* Spawn a thread to listen to our remote process. */
   if (pthread_mutex_init(&global.draw_mutex, NULL)) {
