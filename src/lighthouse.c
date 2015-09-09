@@ -246,7 +246,6 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
   switch (key) {
     case 65293: /* Enter. */
       if (global.results && global.result_highlight < global.result_count) {
-        printf("%s", global.results[global.result_highlight].action);
         goto cleanup;
       }
       break;
