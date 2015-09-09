@@ -138,8 +138,7 @@ static void get_next_non_title(uint32_t *highlight) {
  */
 static void get_next_line(uint32_t *highlight) {
       get_next_non_title(highlight);
-      if(global.results[*highlight].action &&
-              *highlight == global.result_count) {
+      if(*highlight == global.result_count) {
           /* If the last result is a title go on the top. */
           *highlight = -1;
           global.result_offset = 0;
@@ -155,8 +154,12 @@ static void get_next_line(uint32_t *highlight) {
  */
 static void get_previous_non_title(uint32_t *highlight) {
     (*highlight)--;
-    while ((*highlight) > (uint32_t) -1 && !global.results[*highlight].action) {
-        /* Searching for the previous result with an action.*/
+    while ((*highlight) < global.result_count && !global.results[*highlight].action) {
+        /* Searching for the previous result with an action.
+         *
+         * *(*highlight) < global.result_count is used because I use highlight is
+         * unsigned so it when it hit "-1", it's bigger than global.result_count
+         */
         (*highlight)--;
     }
 }
@@ -170,7 +173,7 @@ static void get_previous_non_title(uint32_t *highlight) {
 static void get_previous_line(uint32_t *highlight) {
     get_previous_non_title(highlight);
 
-    if(*highlight == (uint32_t) -1) {
+    if(*highlight == (uint32_t) - 1) {
         *highlight = global.result_count;
         get_previous_non_title(highlight);
     }
@@ -246,6 +249,7 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
   switch (key) {
     case 65293: /* Enter. */
       if (global.results && global.result_highlight < global.result_count) {
+        printf("%s", global.results[global.result_highlight].action);
         goto cleanup;
       }
       break;
