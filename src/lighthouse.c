@@ -147,6 +147,25 @@ static void get_next_line(uint32_t *highlight) {
       global.result_highlight = *highlight;
 }
 
+   /* @brief Set the highlight below the next title present in global.results
+ *
+ * @param Copy of the global.result_highlight for the ease of use.
+ */
+static void next_title(uint32_t *highlight) {
+  while (*highlight < global.result_count && global.results[*highlight].action) {
+    (*highlight)++;
+  }
+  if (*highlight == global.result_count) {
+    /* highlight hit the bottom. */
+    *highlight = 0;
+    global.result_offset = 0;
+    while (*highlight < global.result_count - 1 && global.results[*highlight].action) {
+      (*highlight)++;
+    }
+  }
+  get_next_line(highlight);
+}
+
 /* @brief Set the param "highlight" on the previous line by passing all
  *        the title line (with no action).
  *
@@ -178,6 +197,25 @@ static void get_previous_line(uint32_t *highlight) {
         get_previous_non_title(highlight);
     }
     global.result_highlight = *highlight;
+}
+
+/* @brief Set the highlight above the previous title present in global.results
+ *
+ * @param Copy of the global.result_highlight for the ease of use.
+ */
+static void previous_title(uint32_t *highlight) {
+    while (*highlight > 0 && global.results[*highlight].action) {
+      (*highlight)--;
+    }
+
+    if (*highlight == 0 && global.results[*highlight].action) {
+        /* highlight hit the top . */
+        *highlight = global.result_count - 1;
+        while (*highlight > 0 && global.results[*highlight].action) {
+          (*highlight)--;
+        }
+    }
+    get_previous_line(highlight);
 }
 
 
@@ -212,39 +250,17 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
   uint32_t highlight = global.result_highlight;
   uint32_t old_pos;
   if (global.result_count && key == 100 && mod_key == 3) {
-      /* CTRL-D
-       * GO down to the next title
-       */
-      while (highlight < global.result_count && global.results[highlight].action) {
-          highlight++;
-      }
-      if (highlight == global.result_count) {
-        /* highlight hit the bottom. */
-        highlight = 0;
-        global.result_offset = 0;
-        while (highlight < global.result_count - 1 && global.results[highlight].action) {
-            highlight++;
-        }
-      }
-      get_next_line(&highlight);
-      draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
+    /* CTRL-D
+     * GO down to the next title
+     */
+    next_title(&highlight);
+    draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
   } else if (global.result_count && key == 117 && mod_key == 3) {
-      /* CTRL-U
-       * GO up to the next title
-       */
-      while (highlight > 0 && global.results[highlight].action) {
-          highlight--;
-      }
-
-      if (highlight == 0 && global.results[highlight].action) {
-        /* highlight hit the top . */
-        highlight = global.result_count - 1;
-        while (highlight > 0 && global.results[highlight].action) {
-            highlight--;
-        }
-      }
-      get_previous_line(&highlight);
-      draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
+    /* CTRL-U
+     * GO up to the next title
+     */
+    previous_title(&highlight);
+    draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
   } else {
   switch (key) {
     case 65293: /* Enter. */
@@ -252,6 +268,14 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
         printf("%s", global.results[global.result_highlight].action);
         goto cleanup;
       }
+      break;
+    case 65471: /* F2 */
+      next_title(&highlight);
+      draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
+      break;
+    case 65472: /* F3 */
+      previous_title(&highlight);
+      draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
       break;
     case 65361: /* Left. */
       if (*query_cursor_index > 0) {
