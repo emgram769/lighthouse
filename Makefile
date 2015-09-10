@@ -19,8 +19,8 @@ ifeq ($(platform),Darwin)
 endif
 
 # Library specific
-HAS_GDK=`pkg-config --exists gdk-2.0 && echo $?`
-ifeq ($(HAS_GDK),0)
+HAS_GDK := $(shell pkg-config --exists gdk-2.0 echo $?)
+ifdef $(HAS_GDK)
 	CFLAGS+=`pkg-config --cflags gdk-2.0`
 	LDFLAGS+=`pkg-config --libs gdk-2.0`
 else
