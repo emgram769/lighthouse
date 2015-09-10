@@ -172,17 +172,15 @@ uint32_t parse_result_text(char *text, size_t length, result_t **results) {
     }
     /* Split brace. */
     else if (text[index] == '|') {
-      if ((mode != 1) && (mode != 2)) {
+      text[index] = 0;
+      if (mode == 0) {
         fprintf(stderr, "Syntax error, found | at index %d.\n %s\n", index, text);
         free(ret);
         return 0;
-      }
-      text[index] = 0;
-      if ((index + 1 < length) && (mode == 1)){
+      } else if ((index + 1 < length) && (mode == 1)){
         ret[count - 1].action = &(text[index+1]);
         /* Can be a description or an action */
-      }
-      if ((index + 1 < length) && (mode == 2)){
+      } else if ((index + 1 < length) && (mode == 2)){
         ret[count - 1].desc = &(text[index+1]);
       }
       mode++;

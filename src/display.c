@@ -270,7 +270,7 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
       case NEW_LINE:
         break;
       case CENTER:
-        offset.x += (settings.desc_size - d.data_length) / 2;
+        offset.x = (settings.width / 2) - (d.data_length / 2);
       case DRAW_TEXT:
       default:
         offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_NORMAL, settings.font_size);
@@ -337,7 +337,7 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
         break;
       case CENTER:
         if (d.data_length < settings.desc_size)
-            offset.x += (settings.desc_size - d.data_length) / 2;
+            offset.x = settings.width + (settings.desc_size / 2) - (d.data_length / 2);
       case DRAW_TEXT:
       default:
         offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_NORMAL, settings.desc_font_size);
@@ -414,6 +414,7 @@ void draw_result_text(xcb_connection_t *connection, xcb_window_t window, cairo_t
     if (!(results[index].action)) {
       /* Title */
       draw_line(cr, results[index].text, line, &settings.result_fg, &settings.result_bg);
+      /* TODO Add options for titles. */
     } else if (index != global.result_highlight) {
       draw_line(cr, results[index].text, line, &settings.result_fg, &settings.result_bg);
     } else {
