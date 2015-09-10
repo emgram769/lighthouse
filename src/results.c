@@ -40,7 +40,7 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length) {
 
   char *data = NULL;
   draw_type_t type = DRAW_TEXT;
-  uint32_t data_length = NULL;
+  uint32_t data_length = 0;
 
   /* We've found a sequence of some kind. */
   if (**c == '%') {
