@@ -249,13 +249,13 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
 
   uint32_t highlight = global.result_highlight;
   uint32_t old_pos;
-  if ((global.result_count && key == 100 && mod_key == 3) || key == 65471) {
+  if (global.result_count && key == 100 && mod_key == 3) {
     /* CTRL-D
      * GO down to the next title
      */
     next_title(&highlight);
     draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
-  } else if ((global.result_count && key == 117 && mod_key == 3) || key == 65472) {
+  } else if (global.result_count && key == 117 && mod_key == 3) {
     /* CTRL-U
      * GO up to the next title
      */
