@@ -172,17 +172,15 @@ uint32_t parse_result_text(char *text, size_t length, result_t **results) {
     }
     /* Split brace. */
     else if (text[index] == '|') {
-      if ((mode != 1) && (mode != 2)) {
+      text[index] = 0;
+      if (mode == 0) {
         fprintf(stderr, "Syntax error, found | at index %d.\n %s\n", index, text);
         free(ret);
         return 0;
-      }
-      text[index] = 0;
-      if ((index + 1 < length) && (mode == 1)){
+      } else if ((index + 1 < length) && (mode == 1)){
         ret[count - 1].action = &(text[index+1]);
         /* Can be a description or an action */
-      }
-      if ((index + 1 < length) && (mode == 2)){
+      } else if ((index + 1 < length) && (mode == 2)){
         ret[count - 1].desc = &(text[index+1]);
       }
       mode++;
@@ -194,8 +192,13 @@ uint32_t parse_result_text(char *text, size_t length, result_t **results) {
         free(ret);
         return 0;
       }
+      if (mode == 1) {
+        /* if no action */
+        ret[count - 1].action = NULL;
+        ret[count - 1].desc = NULL;
+      }
       if (mode == 2) {
-        /* if no description was used in the user script. */
+        /* if no description */
         ret[count - 1].desc = NULL;
       }
       text[index] = 0;

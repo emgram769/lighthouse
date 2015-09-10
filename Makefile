@@ -19,7 +19,7 @@ ifeq ($(platform),Darwin)
 endif
 
 # Library specific
-HAS_GDK=`pkg-config --exists gtk+-3.0 && echo $?`
+HAS_GDK=`pkg-config --exists gdk-2.0 && echo $?`
 ifeq ($(HAS_GDK),0)
 	CFLAGS+=`pkg-config --cflags gtk+-3.0`
 	LDFLAGS+=`pkg-config --libs gtk+-3.0`

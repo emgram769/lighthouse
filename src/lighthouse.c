@@ -84,6 +84,103 @@ static inline int32_t check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_
   return 0;
 }
 
+/* @brief Return number of modifiers present in mask
+ *    0: "Nothing"
+ *    1: "Shift"
+ *    2: "Lock"
+ *    3: "Ctrl"
+ *    4: "Alt",
+ *    5: "Mod2"
+ *    6: "Mod3"
+ *    7: "Mod4"
+ *    8: "Mod5",
+ *    9: "Button1"
+ *    10: "Button2"
+ *    11: "Button3"
+ *    12: "Button4"
+ *    13: "Button5"
+ *    (http://xcb.freedesktop.org/tutorial/events/)
+ *
+ * @param mask Modifier mask return by
+ *      xcb_key_release_event_t k ... ->event;
+ * */
+uint8_t get_modifiers (uint32_t mask) {
+    uint8_t modifier = 0;
+    if (mask) {
+        ++modifier;
+        while (!(mask & 1)) {
+            mask >>= 1;
+            ++modifier;
+        }
+    }
+    return modifier;
+}
+
+
+/* @brief Set the param "highlight" on the next line by passing all
+ *        the title line (with no action).
+ *
+ * @param Copy of the global.result_highlight for the ease of use.
+ */
+static void get_next_non_title(uint32_t *highlight) {
+    (*highlight)++;
+    while ((*highlight) < global.result_count && !global.results[*highlight].action) {
+        /* Searching for the next result with an action.*/
+        (*highlight)++;
+    }
+}
+
+/* @brief Set the global.result_highlight on the next line
+ *        that can be clicked (contain an action), and take care of
+ *        the bottom of the window.
+ *
+ * @param Copy of the global.result_highlight for the ease of use.
+ */
+static void get_next_line(uint32_t *highlight) {
+      get_next_non_title(highlight);
+      if(*highlight == global.result_count) {
+          /* If the last result is a title go on the top. */
+          *highlight = -1;
+          global.result_offset = 0;
+          get_next_non_title(highlight);
+      }
+      global.result_highlight = *highlight;
+}
+
+/* @brief Set the param "highlight" on the previous line by passing all
+ *        the title line (with no action).
+ *
+ * @param Copy of the global.result_highlight for the ease of use.
+ */
+static void get_previous_non_title(uint32_t *highlight) {
+    (*highlight)--;
+    while ((*highlight) < global.result_count && !global.results[*highlight].action) {
+        /* Searching for the previous result with an action.
+         *
+         * *(*highlight) < global.result_count is used because I use highlight is
+         * unsigned so it when it hit "-1", it's bigger than global.result_count
+         */
+        (*highlight)--;
+    }
+}
+
+/* @brief Set the global.result_highlight on the previous line
+ *        that can be clicked (contain an action), and take care of
+ *        the top of the window.
+ *
+ * @param Copy of the global.result_highlight for the ease of use.
+ */
+static void get_previous_line(uint32_t *highlight) {
+    get_previous_non_title(highlight);
+
+    if(*highlight == (uint32_t) - 1) {
+        *highlight = global.result_count;
+        get_previous_non_title(highlight);
+    }
+    global.result_highlight = *highlight;
+}
+
+
 /* @brief Processes an entered key by:
  *
  * 1) Adding the key to the query buffer (backspace will remove a character).
@@ -101,15 +198,54 @@ static inline int32_t check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_
  * @param to_write A descriptor to write to the child process.
  * @return 0 on success and 1 on failure.
  */
-static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer, uint32_t *query_index, uint32_t *query_cursor_index, xcb_keysym_t key, xcb_connection_t *connection, cairo_t *cairo_context, cairo_surface_t *cairo_surface, FILE *to_write) {
+static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer, uint32_t *query_index, uint32_t *query_cursor_index, xcb_keysym_t key, uint16_t modifier_mask, xcb_connection_t *connection, cairo_t *cairo_context, cairo_surface_t *cairo_surface, FILE *to_write) {
   pthread_mutex_lock(&global.result_mutex);
 
   /* Check when we should update. */
   int32_t redraw = 0;
   int32_t resend = 0;
 
-  debug("key: %u\n", key);
+  uint8_t mod_key = get_modifiers(modifier_mask);
 
+  debug("key: %u, modifier: %u\n", key, mod_key);
+
+  uint32_t highlight = global.result_highlight;
+  uint32_t old_pos;
+  if (global.result_count && key == 100 && mod_key == 3) {
+      /* CTRL-D
+       * GO down to the next title
+       */
+      while (highlight < global.result_count && global.results[highlight].action) {
+          highlight++;
+      }
+      if (highlight == global.result_count) {
+        /* highlight hit the bottom. */
+        highlight = 0;
+        global.result_offset = 0;
+        while (highlight < global.result_count - 1 && global.results[highlight].action) {
+            highlight++;
+        }
+      }
+      get_next_line(&highlight);
+      draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
+  } else if (global.result_count && key == 117 && mod_key == 3) {
+      /* CTRL-U
+       * GO up to the next title
+       */
+      while (highlight > 0 && global.results[highlight].action) {
+          highlight--;
+      }
+
+      if (highlight == 0 && global.results[highlight].action) {
+        /* highlight hit the top . */
+        highlight = global.result_count - 1;
+        while (highlight > 0 && global.results[highlight].action) {
+            highlight--;
+        }
+      }
+      get_previous_line(&highlight);
+      draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
+  } else {
   switch (key) {
     case 65293: /* Enter. */
       if (global.results && global.result_highlight < global.result_count) {
@@ -130,58 +266,78 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
       }
       break;
     case 65362: /* Up. */
-      if (global.result_highlight > 0) {
-        global.result_highlight--;
+      if (!global.result_count)
+          break;
+      if (highlight) { /* Avoid segfault when highlight on the top. */
+        old_pos = highlight;
+        get_previous_non_title(&highlight);
+        if (!global.results[highlight].action) {
+            /* If it's a title it mean the get_previous_non_title function
+            * found nothing and hit the top.
+            */
+            highlight = old_pos; /* To not let the highlight point on a title. */
+            if (global.result_offset)
+                global.result_offset--;
+        }
+        global.result_highlight = highlight;
         draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
       }
       break;
     case 65364: /* Down. */
-      if (global.result_count && global.result_highlight < global.result_count - 1) {
-        global.result_highlight++;
-        draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
+      if (!global.result_count)
+          break;
+      if (highlight < global.result_count - 1) {
+       old_pos = highlight;
+       get_next_non_title(&highlight);
+       if (highlight == global.result_count) {
+           /* If no other result with an action can be found, it just inc the
+            * the offset so it can show the hidden title and make the highlight to the
+            * previous non_title.
+            * NB: If the offset limit is exceed, it's handled by the draw_result_text function.
+            */
+            highlight = old_pos;
+            global.result_offset++;
+       }
+       global.result_highlight = highlight;
+       draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
       }
       break;
     case 65289: /* Tab. */
-      if (global.result_count && global.result_highlight < global.result_count - 1) {
-        global.result_highlight++;
-        draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
-      } else if(global.result_count && global.result_highlight == global.result_count - 1) {
-        global.result_highlight = 0;
-        draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
-      }
+      if (!global.result_count)
+          break;
+      get_next_line(&highlight);
+      draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
       break;
     case 65056: /* Shift Tab */
-      if (global.result_count && global.result_highlight > 0) {
-        global.result_highlight--;
-        draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
-      } else if(global.result_count && global.result_highlight == 0) {
-        global.result_highlight = global.result_count - 1;
-        draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
-      }
+      if (!global.result_count)
+          break;
+      get_previous_line(&highlight);
+      draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
       break;
     case 65307: /* Escape. */
       goto cleanup;
     case 65288: /* Backspace. */
       if (*query_index > 0 && *query_cursor_index > 0) {
-        memmove(&query_buffer[(*query_cursor_index) - 1], &query_buffer[*query_cursor_index], *query_index - *query_cursor_index + 1);
-        (*query_cursor_index)--;
-        (*query_index)--;
-        query_buffer[(*query_index)] = 0;
-        redraw = 1;
-        resend = 1;
+          memmove(&query_buffer[(*query_cursor_index) - 1], &query_buffer[*query_cursor_index], *query_index - *query_cursor_index + 1);
+          (*query_cursor_index)--;
+          (*query_index)--;
+          query_buffer[(*query_index)] = 0;
+          redraw = 1;
+          resend = 1;
       } else if (*query_index == 0 && settings.backspace_exit) { /* Backspace with nothing */
-        goto cleanup;
+          goto cleanup;
       }
       break;
     default:
       if (isprint((char)key) && *query_index < MAX_QUERY) {
-        memmove(&query_buffer[(*query_cursor_index) + 1], &query_buffer[*query_cursor_index], *query_index - *query_cursor_index + 1);
-        query_buffer[(*query_cursor_index)++] = key;
-        (*query_index)++;
-        redraw = 1;
-        resend = 1;
+          memmove(&query_buffer[(*query_cursor_index) + 1], &query_buffer[*query_cursor_index], *query_index - *query_cursor_index + 1);
+          query_buffer[(*query_cursor_index)++] = key;
+          (*query_index)++;
+          redraw = 1;
+          resend = 1;
       }
       break;
+  }
   }
 
   if (redraw) {
@@ -729,7 +885,6 @@ int main(int argc, char **argv) {
 
         /* Redraw. */
         redraw_all(connection, window, cairo_context, cairo_surface, query_string, query_cursor_index);
-
         break;
       }
       case XCB_KEY_PRESS: {
@@ -737,8 +892,8 @@ int main(int argc, char **argv) {
       }
       case XCB_KEY_RELEASE: {
         xcb_key_release_event_t *k = (xcb_key_release_event_t *)event;
-        xcb_keysym_t key = xcb_key_press_lookup_keysym(keysyms, k, k->state & ~XCB_MOD_MASK_2);
-        int32_t ret = process_key_stroke(window, query_string, &query_index, &query_cursor_index, key, connection, cairo_context, cairo_surface, to_child);
+        xcb_keysym_t key = xcb_key_press_lookup_keysym(keysyms, k, k->state & ~XCB_MOD_MASK_2 & ~XCB_MOD_MASK_CONTROL);
+        int32_t ret = process_key_stroke(window, query_string, &query_index, &query_cursor_index, key, k->state, connection, cairo_context, cairo_surface, to_child);
         if (ret <= 0) {
           exit_code = ret;
           goto cleanup;

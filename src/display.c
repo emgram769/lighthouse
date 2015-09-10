@@ -39,33 +39,6 @@ static inline offset_t calculate_line_offset(uint32_t line) {
   return result;
 }
 
-/* @brief Resize an image.
- *
- * @param *surface The image to resize.
- * @param width The width of the current image.
- * @param height The height of the current image.
- * @param new_width The width of the image when resized.
- * @param new_height The height of the image when resized.
- */
-cairo_surface_t * scale_surface (cairo_surface_t *surface, int width, int height,
-        int new_width, int new_height) {
-  cairo_surface_t *new_surface = cairo_surface_create_similar(surface,
-          CAIRO_CONTENT_COLOR_ALPHA, new_width, new_height);
-  cairo_t *cr = cairo_create (new_surface);
-
-  cairo_scale (cr, (double)new_width / width, (double)new_height / height);
-  cairo_set_source_surface (cr, surface, 0, 0);
-
-  cairo_pattern_set_extend (cairo_get_source(cr), CAIRO_EXTEND_REFLECT);
-  cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
-
-  cairo_paint (cr);
-
-  cairo_destroy (cr);
-
-  return new_surface;
-}
-
 /* @brief Draw a line of text with a cursor to a cairo context.
  *
  * @param cr A cairo context for drawing to the screen.
@@ -175,7 +148,7 @@ static image_format_t get_new_size(uint32_t width, uint32_t height, uint32_t win
   return new_format;
 }
 
-/* @brief Draw a png at the given offset.
+/* @brief Draw an image at the given offset.
  *
  * @param cr A cairo context for drawing to the screen.
  * @param file The image to be drawn.
@@ -186,9 +159,14 @@ static image_format_t get_new_size(uint32_t width, uint32_t height, uint32_t win
  */
 static void draw_image_with_gdk(cairo_t *cr, const char *file, offset_t offset, uint32_t win_size_x, uint32_t win_size_y, image_format_t *format) {
   GdkPixbuf *image;
-  GError *error;
+  GError *error = NULL;
 
   image = gdk_pixbuf_new_from_file(file, &error);
+  if (image == NULL) {
+      debug("Image opening failed (tried to open %s): %s\n", file, error->message);
+      g_error_free(error);
+      return ;
+  }
 
   image_format_t new_form;
   new_form = get_new_size(gdk_pixbuf_get_width(image), gdk_pixbuf_get_height(image), win_size_x, win_size_y);
@@ -231,13 +209,22 @@ static image_format_t draw_image(cairo_t *cr, const char *file, offset_t offset,
   FILE *picture = fopen(file, "r");
   switch (fgetc(picture)) {
     /* https://en.wikipedia.org/wiki/Magic_number_%28programming%29#Magic_numbers_in_files */
-    case 137:
-    case 255:
-    case 47:
 #ifndef NO_GDK
+    case 137:
+        debug("PNG found\n");
         draw_image_with_gdk(cr, file, offset, win_size_x, win_size_y, &format);
+        break;
+    case 255:
+        debug("JPEG found\n");
+        draw_image_with_gdk(cr, file, offset, win_size_x, win_size_y, &format);
+        break;
+    case 47:
+        debug("GIF found\n");
+        draw_image_with_gdk(cr, file, offset, win_size_x, win_size_y, &format);
+        break;
 #endif
     default:
+        debug("Unknown image format found: %s\n", file);
         break;
   }
   fclose(picture);
@@ -287,7 +274,7 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
       case NEW_LINE:
         break;
       case CENTER:
-        offset.x += (settings.desc_size - d.data_length) / 2;
+        offset.x = (settings.width / 2) - (d.data_length / 2);
       case DRAW_TEXT:
       default:
         offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_NORMAL, settings.font_size);
@@ -354,7 +341,7 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
         break;
       case CENTER:
         if (d.data_length < settings.desc_size)
-            offset.x += (settings.desc_size - d.data_length) / 2;
+            offset.x = settings.width + (settings.desc_size / 2) - (d.data_length / 2);
       case DRAW_TEXT:
       default:
         offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_NORMAL, settings.desc_font_size);
@@ -385,11 +372,22 @@ void draw_result_text(xcb_connection_t *connection, xcb_window_t window, cairo_t
 
   uint32_t max_results = settings.max_height / settings.height - 1;
   uint32_t display_results = min(global.result_count, max_results);
-  if ((global.result_offset + display_results) < (global.result_highlight + 1)) {
-    global.result_offset = global.result_highlight - (display_results - 1);
-    display_results = global.result_count - global.result_offset;
+  /* Set the offset. */
+  if (global.result_count <= max_results) {
+      /* Sometime you use an offset from a previous query and then you send another query
+       * to your script but get only 2 response, you need to reset the offset to 0
+       */
+      global.result_offset = 0;
+  } else if (global.result_count - max_results < global.result_offset) {
+      /* When we need to adjust the offset. */
+      global.result_offset = global.result_count - max_results;
+  } else if ((global.result_offset + display_results) < (global.result_highlight + 1)) {
+      /* Change the offset to match the highlight when scrolling down. */
+      global.result_offset = global.result_highlight - (display_results - 1);
+      display_results = global.result_count - global.result_offset;
   } else if (global.result_offset > global.result_highlight) {
-    global.result_offset = global.result_highlight;
+      /* Used when scrolling up. */
+      global.result_offset = global.result_highlight;
   }
 
   if ((global.result_highlight < global.result_count) &&
@@ -417,7 +415,11 @@ void draw_result_text(xcb_connection_t *connection, xcb_window_t window, cairo_t
   }
 
   for (index = global.result_offset, line = 1; index < global.result_offset + display_results; index++, line++) {
-    if (index != global.result_highlight) {
+    if (!(results[index].action)) {
+      /* Title */
+      draw_line(cr, results[index].text, line, &settings.result_fg, &settings.result_bg);
+      /* TODO Add options for titles. */
+    } else if (index != global.result_highlight) {
       draw_line(cr, results[index].text, line, &settings.result_fg, &settings.result_bg);
     } else {
       draw_line(cr, results[index].text, line, &settings.highlight_fg, &settings.highlight_bg);
