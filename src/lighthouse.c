@@ -147,7 +147,7 @@ static void get_next_line(uint32_t *highlight) {
       global.result_highlight = *highlight;
 }
 
-/* @brief Set the global.result_highlight on the next line
+   /* @brief Set the highlight below the next title present in global.results
  *
  * @param Copy of the global.result_highlight for the ease of use.
  */
@@ -199,6 +199,10 @@ static void get_previous_line(uint32_t *highlight) {
     global.result_highlight = *highlight;
 }
 
+/* @brief Set the highlight above the previous title present in global.results
+ *
+ * @param Copy of the global.result_highlight for the ease of use.
+ */
 static void previous_title(uint32_t *highlight) {
     while (*highlight > 0 && global.results[*highlight].action) {
       (*highlight)--;
