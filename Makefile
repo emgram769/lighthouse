@@ -20,9 +20,9 @@ endif
 
 # Library specific
 HAS_GDK=`pkg-config --exists gdk-2.0 && echo $?`
-ifeq ($(HAS_GDK),0)
-	CFLAGS+=`pkg-config --cflags gtk+-3.0`
-	LDFLAGS+=`pkg-config --libs gtk+-3.0`
+ifneq ($(HAS_GDK),)
+	CFLAGS+=`pkg-config --cflags gdk-2.0`
+	LDFLAGS+=`pkg-config --libs gdk-2.0`
 else
 	CFLAGS+=-DNO_GDK
 endif
