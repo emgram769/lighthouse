@@ -10,6 +10,7 @@
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #include <gdk/gdk.h>
 #include <glib.h>
+#include <pango/pangocairo.h>
 #endif
 
 #include "results.h"

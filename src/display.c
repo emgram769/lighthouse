@@ -111,15 +111,25 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
  * @param foreground The color of the text.
  * @return The advance in the x direction.
  */
-static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_t *foreground, cairo_font_weight_t weight, uint32_t font_size) {
-  cairo_text_extents_t extents;
-  cairo_text_extents(cr, text, &extents);
+static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_t *foreground, PangoFontDescription *font_description) {
+  PangoLayout *layout;
+  layout = pango_cairo_create_layout(cr);
+  pango_layout_set_font_description(layout, font_description);
+  pango_layout_set_text (layout, text, -1);
+
   cairo_move_to(cr, offset.x, offset.y);
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
-  cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, weight);
-  cairo_set_font_size(cr, font_size);
-  cairo_show_text(cr, text);
-  return extents.x_advance;
+  pango_cairo_update_layout(cr, layout);
+
+  int height;
+  int width;
+  pango_layout_get_pixel_size(layout, &width, &height);
+
+  pango_cairo_show_layout_line(cr, pango_layout_get_line (layout, 0));
+
+  g_object_unref(layout);
+
+  return width;
 }
 
 #ifndef NO_GDK
@@ -319,10 +329,16 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
   cairo_fill(cr);
   offset_t offset = calculate_line_offset(line);
 
+  PangoFontDescription *font_description;
+  font_description = pango_font_description_new();
+  pango_font_description_set_family(font_description, settings.font_name);
+  pango_font_description_set_weight(font_description, PANGO_WEIGHT_NORMAL);
+  pango_font_description_set_absolute_size(font_description, settings.font_size * PANGO_SCALE);
+
   /* Parse the result line as we draw it. */
   char *c = (char *)text;
   while (c && *c != '\0') {
-    draw_t d = parse_result_line(cr, &c, settings.width - offset.x);
+    draw_t d = parse_result_line(cr, &c, settings.width - offset.x, font_description);
     if (d.data == NULL)
         break;
     /* Checking if there are still char to draw. */
@@ -336,21 +352,23 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
         offset.x += format.width;
         break;
       case BOLD:
-        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_BOLD, settings.font_size);
+        pango_font_description_set_weight(font_description, PANGO_WEIGHT_BOLD);
+        offset.x += draw_text(cr, d.data, offset, foreground, font_description);
         break;
       case DRAW_LINE:
       case NEW_LINE:
         break;
       case CENTER:
-        offset.x = (settings.width / 2) - (d.data_length / 2);
+        offset.x = (settings.width - d.data_length) / 2;
       case DRAW_TEXT:
       default:
-        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_NORMAL, settings.font_size);
+        pango_font_description_set_weight(font_description, PANGO_WEIGHT_NORMAL);
+        offset.x += draw_text(cr, d.data, offset, foreground, font_description);
         break;
     }
     *c = saved;
   }
-
+  pango_font_description_free (font_description);
   pthread_mutex_unlock(&global.draw_mutex);
 }
 
@@ -372,10 +390,16 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
   cairo_fill(cr);
   offset_t offset = {settings.width + 2, global.real_desc_font_size, 0};
 
+  PangoFontDescription *font_description;
+  font_description = pango_font_description_new();
+  pango_font_description_set_family(font_description, settings.font_name);
+  pango_font_description_set_weight(font_description, PANGO_WEIGHT_NORMAL);
+  pango_font_description_set_absolute_size(font_description, settings.desc_font_size * PANGO_SCALE);
+
   /* Parse the result line as we draw it. */
   char *c = (char *)text;
   while (c && *c != '\0') {
-    draw_t d = parse_result_line(cr, &c, settings.desc_size + settings.width - offset.x);
+    draw_t d = parse_result_line(cr, &c, settings.desc_size + settings.width - offset.x, font_description);
     char saved = *c;
     *c = '\0';
     switch (d.type) {
@@ -405,14 +429,16 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
         offset.image_y += global.real_desc_font_size;
         break;
       case BOLD:
-        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_BOLD, settings.desc_font_size);
+        pango_font_description_set_weight(font_description, PANGO_WEIGHT_BOLD);
+        offset.x += draw_text(cr, d.data, offset, foreground, font_description);
         break;
       case CENTER:
         if (d.data_length < settings.desc_size)
-            offset.x = settings.width + (settings.desc_size / 2) - (d.data_length / 2);
+            offset.x = settings.width + (settings.desc_size - d.data_length) / 2;
       case DRAW_TEXT:
       default:
-        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_NORMAL, settings.desc_font_size);
+        pango_font_description_set_weight(font_description, PANGO_WEIGHT_NORMAL);
+        offset.x += draw_text(cr, d.data, offset, foreground, font_description);
         break;
     }
     *c = saved;
@@ -423,7 +449,7 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
         offset.image_y += global.real_desc_font_size;
     }
   }
-
+  pango_font_description_free (font_description);
   pthread_mutex_unlock(&global.draw_mutex);
 }
 
