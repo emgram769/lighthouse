@@ -10,6 +10,8 @@
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #include <gdk/gdk.h>
 #include <glib.h>
+#endif
+#ifndef NO_PANGO
 #include <pango/pangocairo.h>
 #endif
 

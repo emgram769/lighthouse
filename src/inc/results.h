@@ -3,7 +3,9 @@
 
 #include <cairo/cairo.h>
 #include <cairo/cairo-xcb.h>
+#ifndef NO_PANGO
 #include <pango/pangocairo.h>
+#endif
 
 /* @brief The type of data to draw. */
 typedef enum {
@@ -38,7 +40,11 @@ struct result_params {
   int32_t fd;
 };
 
+#ifndef NO_PANGO
 draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, PangoFontDescription *font_description);
+#else
+draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length);
+#endif
 uint32_t parse_result_text(char *text, size_t length, result_t **results);
 void *get_results(void *args);
 

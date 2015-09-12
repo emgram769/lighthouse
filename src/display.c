@@ -104,11 +104,13 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
   pthread_mutex_unlock(&global.draw_mutex);
 }
 
+#ifndef NO_PANGO
 /* @brief Draw text at the given offset.
  *
  * @param cr A cairo context for drawing to the screen.
  * @param text The text to be drawn.
  * @param foreground The color of the text.
+ * @param font_description pango font description provide info on the font.
  * @return The advance in the x direction.
  */
 static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_t *foreground, PangoFontDescription *font_description) {
@@ -131,6 +133,25 @@ static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_
 
   return width;
 }
+#else
+/* @brief Draw text at the given offset.
+ *
+ * @param cr A cairo context for drawing to the screen.
+ * @param text The text to be drawn.
+ * @param foreground The color of the text.
+ * @return The advance in the x direction.
+ */
+static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_t *foreground, cairo_font_weight_t weight, uint32_t font_size) {
+    cairo_text_extents_t extents;
+    cairo_text_extents(cr, text, &extents);
+    cairo_move_to(cr, offset.x, offset.y);
+    cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
+    cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, weight);
+    cairo_set_font_size(cr, font_size);
+    cairo_show_text(cr, text);
+    return extents.x_advance;
+}
+#endif
 
 #ifndef NO_GDK
 /* @brief Return the new format for a picture to fit in a window.
@@ -329,16 +350,22 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
   cairo_fill(cr);
   offset_t offset = calculate_line_offset(line);
 
+#ifndef NO_PANGO
   PangoFontDescription *font_description;
   font_description = pango_font_description_new();
   pango_font_description_set_family(font_description, settings.font_name);
   pango_font_description_set_weight(font_description, PANGO_WEIGHT_NORMAL);
   pango_font_description_set_absolute_size(font_description, settings.font_size * PANGO_SCALE);
+#endif
 
   /* Parse the result line as we draw it. */
   char *c = (char *)text;
   while (c && *c != '\0') {
+#ifndef NO_PANGO
     draw_t d = parse_result_line(cr, &c, settings.width - offset.x, font_description);
+#else
+    draw_t d = parse_result_line(cr, &c, settings.width - offset.x);
+#endif
     if (d.data == NULL)
         break;
     /* Checking if there are still char to draw. */
@@ -352,8 +379,12 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
         offset.x += format.width;
         break;
       case BOLD:
+#ifndef NO_PANGO
         pango_font_description_set_weight(font_description, PANGO_WEIGHT_BOLD);
         offset.x += draw_text(cr, d.data, offset, foreground, font_description);
+#else
+        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_NORMAL, settings.font_size);
+#endif
         break;
       case DRAW_LINE:
       case NEW_LINE:
@@ -362,13 +393,19 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
         offset.x = (settings.width - d.data_length) / 2;
       case DRAW_TEXT:
       default:
+#ifndef NO_PANGO
         pango_font_description_set_weight(font_description, PANGO_WEIGHT_NORMAL);
         offset.x += draw_text(cr, d.data, offset, foreground, font_description);
+#else
+        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_BOLD, settings.font_size);
+#endif
         break;
     }
     *c = saved;
   }
+#ifndef NO_PANGO
   pango_font_description_free (font_description);
+#endif
   pthread_mutex_unlock(&global.draw_mutex);
 }
 
@@ -390,16 +427,22 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
   cairo_fill(cr);
   offset_t offset = {settings.width + 2, global.real_desc_font_size, 0};
 
+#ifndef NO_PANGO
   PangoFontDescription *font_description;
   font_description = pango_font_description_new();
   pango_font_description_set_family(font_description, settings.font_name);
   pango_font_description_set_weight(font_description, PANGO_WEIGHT_NORMAL);
   pango_font_description_set_absolute_size(font_description, settings.desc_font_size * PANGO_SCALE);
+#endif
 
   /* Parse the result line as we draw it. */
   char *c = (char *)text;
   while (c && *c != '\0') {
+#ifndef NO_PANGO
     draw_t d = parse_result_line(cr, &c, settings.desc_size + settings.width - offset.x, font_description);
+#else
+    draw_t d = parse_result_line(cr, &c, settings.width - offset.x);
+#endif
     char saved = *c;
     *c = '\0';
     switch (d.type) {
@@ -429,16 +472,24 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
         offset.image_y += global.real_desc_font_size;
         break;
       case BOLD:
+#ifndef NO_PANGO
         pango_font_description_set_weight(font_description, PANGO_WEIGHT_BOLD);
         offset.x += draw_text(cr, d.data, offset, foreground, font_description);
+#else
+        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_NORMAL, settings.font_size);
+#endif
         break;
       case CENTER:
         if (d.data_length < settings.desc_size)
             offset.x = settings.width + (settings.desc_size - d.data_length) / 2;
       case DRAW_TEXT:
       default:
+#ifndef NO_PANGO
         pango_font_description_set_weight(font_description, PANGO_WEIGHT_NORMAL);
         offset.x += draw_text(cr, d.data, offset, foreground, font_description);
+#else
+        offset.x += draw_text(cr, d.data, offset, foreground, CAIRO_FONT_WEIGHT_BOLD, settings.font_size);
+#endif
         break;
     }
     *c = saved;
@@ -449,7 +500,9 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
         offset.image_y += global.real_desc_font_size;
     }
   }
+#ifndef NO_PANGO
   pango_font_description_free (font_description);
+#endif
   pthread_mutex_unlock(&global.draw_mutex);
 }
 

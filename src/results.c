@@ -32,7 +32,11 @@ static void get_in(char **c, char **data) {
  * @param line_length length in pixel of the line.
  * @return A populated draw_t type.
  */
+#ifndef NO_PANGO
 draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, PangoFontDescription *font_description) {
+#else
+draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length) {
+#endif
   if (!c || !*c) {
     fprintf(stderr, "Invalid parse state");
     return (draw_t){ DRAW_TEXT, NULL }; /* This will invoke a segfault most likely. */
@@ -53,6 +57,7 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, PangoFontD
         type = CENTER;
         get_in(c, &data);
 
+#ifndef NO_PANGO
         PangoLayout *layout;
         layout = pango_cairo_create_layout(cr);
         pango_layout_set_font_description(layout, font_description);
@@ -71,6 +76,16 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, PangoFontD
         data_length -= end_width;
 
         g_object_unref(layout);
+#else
+        cairo_text_extents_t extents;
+        /* http://cairographics.org/manual/cairo-cairo-scaled-font-t.html#cairo-text-extents-t
+         * For more information on cairo text extents.
+         */
+        cairo_text_extents(cr, data, &extents);
+        data_length = extents.x_advance;
+        cairo_text_extents(cr, *c, &extents);
+        data_length -= extents.x_advance;
+#endif
         break;
       case 'B':
         type = BOLD;
@@ -102,16 +117,24 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, PangoFontD
     }
     type = DRAW_TEXT;
 
+#ifndef NO_PANGO
     PangoLayout *layout;
     layout = pango_cairo_create_layout(cr);
     pango_layout_set_font_description(layout, font_description);
     pango_layout_set_text(layout, *c, -1);
     pango_cairo_update_layout(cr, layout);
 
-    int height;
     int width;
-    pango_layout_get_pixel_size(layout, &width, &height);
+    pango_layout_get_pixel_size(layout, &width, NULL);
     data_length = width;
+#else
+    cairo_text_extents_t extents;
+    /* http://cairographics.org/manual/cairo-cairo-scaled-font-t.html#cairo-text-extents-t
+     * For more information on cairo text extents.
+     */
+    cairo_text_extents(cr, data, &extents);
+    data_length = extents.x_advance;
+#endif
     /* length of the line from the "data" variable position */
     if (data_length > line_length) {
         /* Checking if the text is long enough to exceed the line length
@@ -120,12 +143,15 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, PangoFontD
         while (**c != '\0' && **c != '%'
                && !(**c == '\\' && *(*c + 1) == '%')) {
             *c += 1;
+#ifndef NO_PANGO
             pango_layout_set_text(layout, *c, -1);
             pango_cairo_update_layout(cr, layout);
-            int height;
-            int width;
-            pango_layout_get_pixel_size(layout, &width, &height);
+            pango_layout_get_pixel_size(layout, &width, NULL);
             if ((data_length - width) > line_length) {
+#else
+            cairo_text_extents(cr, *c, &extents);
+            if ((data_length - extents.x_advance) > line_length) {
+#endif
                 /* data_length - extents.x_advance let us know the
                  * length of the current line.
                  */
@@ -141,7 +167,9 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, PangoFontD
             *c += 1;
         }
     }
+#ifndef NO_PANGO
     g_object_unref(layout);
+#endif
   }
 
   return (draw_t){ type, data, data_length };
