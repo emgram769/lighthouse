@@ -26,8 +26,8 @@ ifdef $(HAS_GDK)
 else
 	CFLAGS+=-DNO_GDK
 endif
-HAS_GDK := $(shell pkg-config --exists pango echo $?)
-ifdef $(HAS_GDK)
+HAS_PANGO := $(shell pkg-config --exists pango echo $?)
+ifdef $(HAS_PANGO)
 	CFLAGS+=`pkg-config --cflags pango`
 	LDFLAGS+=`pkg-config --libs pango`
 else
