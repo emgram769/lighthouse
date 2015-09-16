@@ -71,6 +71,19 @@ generate the results.  A selected result (move with arrow keys to highlight
 and then hit enter to select) will then have its `action`
 printed to standard out (and in the case above, into the shell).
 
+# Passing arguments to cmd
+
+Lighthouse will pass any unrecognized arguments it gets on to the cmd handler.
+The preferred way to pass arguments for your cmd handler to lighthouse is like this:
+
+    lighthouse -- some-cmd-argument --some-cmd-option | sh
+
+Using the GNU standard '--' to tell Lighthouse not to attempt to parse arguments beyond that point.
+This is important, as it prevents Lighthouse from seeing `--some-cmd-option`,
+attempting to recognize it as a lighthouse option,
+and failing. It also means you can reuse option characters used by lighthouse for your cmd handler
+(eg. '-c'), if you need to.
+
 Syntax
 ---
 The syntax of a result is simple.
@@ -114,6 +127,10 @@ Options
 ---
 The `-c` command line flag will allow you to set a custom location for the configurations file.
 An example would be `lighthouse -c ~/lighthouserc2`.
+
+If passing additional arguments to the cmd handler (see 'Passing arguments to cmd' above),
+all options to lighthouse should come before the `--`.
+For example `lighthouse -c ~/lighthouserc2 -- some arguments for cmd handler`
 
 Configuration file
 ---
