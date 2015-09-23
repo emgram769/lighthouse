@@ -11,15 +11,20 @@
 typedef enum {
   DRAW_TEXT,
   DRAW_IMAGE,
-  CENTER,
-  BOLD,
   DRAW_LINE,
   NEW_LINE
 } draw_type_t;
 
+typedef enum {
+  CENTER,
+  BOLD
+} modifier_type_t;
+
 /* @brief Type used to pass around drawing options. */
-typedef struct {
+typedef struct draw_t {
   draw_type_t type;
+  modifier_type_t *modifiers_array;
+  uint32_t modifiers_array_length;
   char *data;
   uint32_t data_length; /* Not always filled */
 } draw_t;
@@ -41,11 +46,10 @@ struct result_params {
 };
 
 #ifndef NO_PANGO
-draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, PangoFontDescription *font_description);
+draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, modifier_type_t **modifiers_array, PangoFontDescription *font_description);
 #else
-draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length);
+draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, modifier_type_t **modifiers_array);
 #endif
 uint32_t parse_result_text(char *text, size_t length, result_t **results);
-void *get_results(void *args);
 
 #endif /* _RESULTS_H */
