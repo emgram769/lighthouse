@@ -23,9 +23,10 @@
 static void get_characters(cairo_t *cr, char **c, char **data, uint32_t *data_length, uint32_t line_length, PangoFontDescription *font_description) {
   /* Case we should stop the loop:
    * 1) End of the line: "\0".
-   * 2) New text modification (%C, %B).
+   * 2) New text modification (%C, %B, ...).
    * 3) End of text modification (%).
-   * 4) End of the line.
+   * 4) New type (%I, ...)
+   * 5) End of the line.
    */
    *data = *c;
 
@@ -69,9 +70,10 @@ static void get_characters(cairo_t *cr, char **c, char **data, uint32_t *data_le
 static void get_characters_cairo(cairo_t *cr, char **c, char **data, uint32_t *data_length, uint32_t line_length) {
   /* Case we should stop the loop:
    * 1) End of the line: "\0".
-   * 2) New text modification (%C, %B).
+   * 2) New text modification (%C, %B, ...).
    * 3) End of text modification (%).
-   * 4) End of the line.
+   * 4) New type (%I, ...)
+   * 5) End of the line.
    */
    *data = *c;
 
@@ -88,9 +90,6 @@ static void get_characters_cairo(cairo_t *cr, char **c, char **data, uint32_t *d
        cairo_text_extents(cr, *c, &extents);
        *data_length = (begin_length - extents.x_advance);
        if (line_length < *data_length) {
-           /* data_length - extents.x_advance let us know the
-            * length of the current line.
-            */
            (*c)--;
            if (**c == **data)
                *data = NULL;
@@ -132,23 +131,41 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, modifier_t
   /* We've found a sequence of some kind. */
   if (**c == '%') {
     switch (*(*c+1)) {
+      /* --------------------------------------------------------------------
+       * TYPE
+       * --------------------------------------------------------------------
+       */
       case 'I':
         type = DRAW_IMAGE;
         *c += 2;
         data = *c;
+        /* "get_charachter" is not used here because we don't need to take care
+         * of the end of the line for exemple. The text we get here is not meant
+         * to be displayed.
+         */
         while (**c != '%') {
             *c += 1;
         }
         modifiers_array_length++;
         set_new_size(modifiers_array, modifiers_array_length);
         (*modifiers_array)[modifiers_array_length - 1] = NONE;
-        /* Trivial modifier used because this type use a '%' at the end of the filename.
-         * If we don't use that trivial modifier, in this case:
+        /* DRAW_IMAGE type is special, it need to be followed by the image filename, so
+         * the %I..% are used to specify it.
+         * If we don't use a trivial modifier, in this case:
          *      %C... %I...%...%
+         *                 ^
+         *                 |
+         *                 +--- At this point the modifiers_array_length
+         *                      is decremented in the "default" case
+         *                      so the previous argument is erased and lost.
          *  The text won't be centered anymore after the %I...%
          */
         break;
       case 'N':
+        /* In this case the type is "simple" (%N) so it don't need the
+         * a trivial modifier because it will never hit another '%'
+         * that cause a "modfifiers_array_length" decrementation.
+         */
         type = NEW_LINE;
         *c += 2;
         break;
@@ -156,7 +173,12 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, modifier_t
         type = DRAW_LINE;
         *c += 2;
         break;
+      /* --------------------------------------------------------------------
+       * MODIFIER
+       * --------------------------------------------------------------------
+       */
       case 'C':
+        /* Work with the DRAW_TEXT and DRAW_IMAGE type */
         *c += 2;
 #ifndef NO_PANGO
         get_characters(cr, c, &data, &data_length, line_length, font_description);
@@ -168,6 +190,7 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, modifier_t
         (*modifiers_array)[modifiers_array_length - 1] = CENTER;
         break;
       case 'B':
+        /* Work with the DRAW_TEXT type */
         *c += 2;
 #ifndef NO_PANGO
         get_characters(cr, c, &data, &data_length, line_length, font_description);
@@ -180,16 +203,14 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, modifier_t
         (*modifiers_array)[modifiers_array_length - 1] = BOLD;
         break;
       case '\\':
-        (*c)++; /* If '\\' is used it mean The user used a char like (C, B, I, ...)
-                 * next to the %.\
-                 */
-      default:
-        /* TODO BUG WHEN: %C... %I...%...%
-         *                           ^
-         *                           |
-         *                           +- modifiers_array_length set to zero.
-         *  What to do set one trivial CENTER in the array ?
+        /* If '\\' is used, it mean the user used a char like (C, B, I, ...)
+         * next to the % and didn't meant to set another type/modifier.
+         *
+         * DON'T ----> %C...%It will bug here.
+         * DO -------> %C...%\\It works.
          */
+        (*c)++;
+      default:
         /* Return to the previous text mod state.
          * ex: %C ... %B ... % ... %
          *                   ^
@@ -206,6 +227,8 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, modifier_t
 
         if (modifiers_array_length)
             modifiers_array_length--;
+        else
+            debug("Error in the result text: '%' wrongly placed.")
         set_new_size(modifiers_array, modifiers_array_length);
         break;
     }
@@ -213,7 +236,7 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, modifier_t
     /* When we are in a case like this:
      * %C ... String to long to be drawn in one line ... %
      * We just don't touch the modifiers_array so it still have the old
-     * modifier used previously.
+     * modifier used previously in memory.
      * Those will be erased at the '%' (default case normally).
      */
 
