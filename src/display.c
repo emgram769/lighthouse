@@ -112,16 +112,18 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
  * @param charac Characteristic of the text to be drawn.
  * @param line_width Width of the current line (depend of desc or line) that
  *      can still be used.
+ * @param *offset Pointer to offset, because some modifiers will modify directly
+ *      the offset.
  * @param foreground The color of the text.
  * @param font_description pango font description provide info on the font.
  * @return The advance in the x direction.
  */
-static uint32_t draw_text(cairo_t *cr, draw_t *charac, uint32_t line_width, offset_t offset, color_t *foreground, PangoFontDescription *font_description) {
+static uint32_t draw_text(cairo_t *cr, draw_t *charac, uint32_t line_width, offset_t *offset, color_t *foreground, PangoFontDescription *font_description) {
   /* Checking every previous modifier and setting up the parameter. */
   for (uint32_t i=0; i < charac->modifiers_array_length; i++) {
       switch ((charac->modifiers_array)[i]) {
           case CENTER:
-              offset.x += (line_width - charac->data_length) / 2;
+              offset->x += (line_width - charac->data_length) / 2;
               break;
           case BOLD:
               pango_font_description_set_weight(font_description, PANGO_WEIGHT_BOLD);
@@ -138,7 +140,7 @@ static uint32_t draw_text(cairo_t *cr, draw_t *charac, uint32_t line_width, offs
   pango_layout_set_font_description(layout, font_description);
   pango_layout_set_text (layout, charac->data, -1);
 
-  cairo_move_to(cr, offset.x, offset.y);
+  cairo_move_to(cr, offset->x, offset->y);
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
   pango_cairo_update_layout(cr, layout);
 
@@ -156,18 +158,22 @@ static uint32_t draw_text(cairo_t *cr, draw_t *charac, uint32_t line_width, offs
 /* @brief Draw text at the given offset.
  *
  * @param cr A cairo context for drawing to the screen.
- * @param text The text to be drawn.
+ * @param charac Characteristic of the text to be drawn.
+ * @param line_width Width of the current line (depend of desc or line) that
+ *      can still be used.
+ * @param *offset Pointer to offset, because some modifiers will modify directly
+ *      the offset.
  * @param foreground The color of the text.
  * @return The advance in the x direction.
  */
-static uint32_t draw_text(cairo_t *cr, draw_t *charac, uint32_t line_width, offset_t offset, color_t *foreground, uint32_t font_size) {
+static uint32_t draw_text(cairo_t *cr, draw_t *charac, uint32_t line_width, offset_t *offset, color_t *foreground, uint32_t font_size) {
   /* Checking every previous modifier and setting up the parameter. */
   cairo_font_weight_t weight = CAIRO_FONT_WEIGHT_NORMAL;
   for (uint32_t i=0; i < charac->modifiers_array_length; i++) {
       switch ((charac->modifiers_array)[i]) {
           case CENTER: ;
-              uint32_t tmp = offset.x;
-              offset.x += (line_width - tmp - charac->data_length) / 2;
+              uint32_t tmp = offset->x;
+              offset->x += (line_width - tmp - charac->data_length) / 2;
               break;
           case BOLD:
               weight = CAIRO_FONT_WEIGHT_BOLD;
@@ -180,7 +186,7 @@ static uint32_t draw_text(cairo_t *cr, draw_t *charac, uint32_t line_width, offs
 
   cairo_text_extents_t extents;
   cairo_text_extents(cr, charac->data, &extents);
-  cairo_move_to(cr, offset.x, offset.y);
+  cairo_move_to(cr, offset->x, offset->y);
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
   cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, weight);
   cairo_set_font_size(cr, font_size);
@@ -450,9 +456,9 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
         default:
 #ifndef NO_PANGO
             pango_font_description_set_weight(font_description, PANGO_WEIGHT_NORMAL);
-            offset.x += draw_text(cr, &d, settings.width - offset.x, offset, foreground, font_description);
+            offset.x += draw_text(cr, &d, settings.width - offset.x, &offset, foreground, font_description);
 #else
-            offset.x += draw_text(cr, &d, settings.width - offset.x, offset, foreground, settings.font_size);
+            offset.x += draw_text(cr, &d, settings.width - offset.x, &offset, foreground, settings.font_size);
 #endif
             break;
     }
@@ -539,9 +545,9 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
       default:
 #ifndef NO_PANGO
         pango_font_description_set_weight(font_description, PANGO_WEIGHT_NORMAL);
-        offset.x += draw_text(cr, &d, settings.width + settings.desc_size - offset.x, offset, foreground, font_description);
+        offset.x += draw_text(cr, &d, settings.width + settings.desc_size - offset.x, &offset, foreground, font_description);
 #else
-        offset.x += draw_text(cr, &d, settings.width + settings.desc_size - offset.x, offset, foreground, settings.font_size);
+        offset.x += draw_text(cr, &d, settings.width + settings.desc_size - offset.x, &offset, foreground, settings.font_size);
 #endif
         break;
     }
