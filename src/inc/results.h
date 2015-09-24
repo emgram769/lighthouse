@@ -16,6 +16,7 @@ typedef enum {
 } draw_type_t;
 
 typedef enum {
+  NONE,
   CENTER,
   BOLD
 } modifier_type_t;

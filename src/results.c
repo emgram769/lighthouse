@@ -19,6 +19,7 @@
  * @param data_length A reference to the data_length variable wich will store
  *              the length of the result data.
  */
+#ifndef NO_PANGO
 static void get_characters(cairo_t *cr, char **c, char **data, uint32_t *data_length, uint32_t line_length, PangoFontDescription *font_description) {
   /* Case we should stop the loop:
    * 1) End of the line: "\0".
@@ -28,7 +29,6 @@ static void get_characters(cairo_t *cr, char **c, char **data, uint32_t *data_le
    */
    *data = *c;
 
-#ifndef NO_PANGO
    PangoLayout *layout;
    layout = pango_cairo_create_layout(cr);
    pango_layout_set_font_description(layout, font_description);
@@ -42,27 +42,15 @@ static void get_characters(cairo_t *cr, char **c, char **data, uint32_t *data_le
    int end_length; /* Get the line length from the '*c' pointer,
                     * until the end of the line.
                     */
-#else
-   cairo_text_extents_t extents;
-   /* http://cairographics.org/manual/cairo-cairo-scaled-font-t.html#cairo-text-extents-t
-    * For more information on cairo text extents.
-    */
-   cairo_text_extents(cr, *data, &extents);
-   int begin_length = extents.x_advance;
-#endif
 
    while (**c != '\0' && **c != '%'
            && !(**c == '\\' && *(*c + 1) == '%')) {
        (*c)++;
-#ifndef NO_PANGO
        pango_layout_set_text(layout, *c, -1);
        pango_cairo_update_layout(cr, layout);
        pango_layout_get_pixel_size(layout, &end_length, NULL);
        *data_length = (begin_length - end_length);
-#else
-       cairo_text_extents(cr, *c, &extents);
-       *data_length = (begin_length - extents.x_advance);
-#endif
+
        if (line_length < *data_length) {
            /* data_length - extents.x_advance let us know the
             * length of the current line.
@@ -74,10 +62,43 @@ static void get_characters(cairo_t *cr, char **c, char **data, uint32_t *data_le
        }
    }
 
-#ifndef NO_PANGO
     g_object_unref(layout);
-#endif
 }
+#else
+
+static void get_characters_cairo(cairo_t *cr, char **c, char **data, uint32_t *data_length, uint32_t line_length) {
+  /* Case we should stop the loop:
+   * 1) End of the line: "\0".
+   * 2) New text modification (%C, %B).
+   * 3) End of text modification (%).
+   * 4) End of the line.
+   */
+   *data = *c;
+
+   cairo_text_extents_t extents;
+   /* http://cairographics.org/manual/cairo-cairo-scaled-font-t.html#cairo-text-extents-t
+    * For more information on cairo text extents.
+    */
+   cairo_text_extents(cr, *data, &extents);
+   int begin_length = extents.x_advance;
+
+   while (**c != '\0' && **c != '%'
+           && !(**c == '\\' && *(*c + 1) == '%')) {
+       (*c)++;
+       cairo_text_extents(cr, *c, &extents);
+       *data_length = (begin_length - extents.x_advance);
+       if (line_length < *data_length) {
+           /* data_length - extents.x_advance let us know the
+            * length of the current line.
+            */
+           (*c)--;
+           if (**c == **data)
+               *data = NULL;
+           break;
+       }
+   }
+}
+#endif
 
 static inline void set_new_size(modifier_type_t **modifiers_array, uint32_t size) {
     modifier_type_t *tmp = realloc(*modifiers_array, size * sizeof(modifier_type_t));
@@ -118,6 +139,14 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, modifier_t
         while (**c != '%') {
             *c += 1;
         }
+        modifiers_array_length++;
+        set_new_size(modifiers_array, modifiers_array_length);
+        (*modifiers_array)[modifiers_array_length - 1] = NONE;
+        /* Trivial modifier used because this type use a '%' at the end of the filename.
+         * If we don't use that trivial modifier, in this case:
+         *      %C... %I...%...%
+         *  The text won't be centered anymore after the %I...%
+         */
         break;
       case 'N':
         type = NEW_LINE;
@@ -129,14 +158,23 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, modifier_t
         break;
       case 'C':
         *c += 2;
+#ifndef NO_PANGO
         get_characters(cr, c, &data, &data_length, line_length, font_description);
+#else
+        get_characters_cairo(cr, c, &data, &data_length, line_length);
+#endif
         modifiers_array_length++;
         set_new_size(modifiers_array, modifiers_array_length);
         (*modifiers_array)[modifiers_array_length - 1] = CENTER;
         break;
       case 'B':
         *c += 2;
+#ifndef NO_PANGO
         get_characters(cr, c, &data, &data_length, line_length, font_description);
+#else
+        get_characters_cairo(cr, c, &data, &data_length, line_length);
+#endif
+
         modifiers_array_length++;
         set_new_size(modifiers_array, modifiers_array_length);
         (*modifiers_array)[modifiers_array_length - 1] = BOLD;
@@ -146,6 +184,12 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, modifier_t
                  * next to the %.\
                  */
       default:
+        /* TODO BUG WHEN: %C... %I...%...%
+         *                           ^
+         *                           |
+         *                           +- modifiers_array_length set to zero.
+         *  What to do set one trivial CENTER in the array ?
+         */
         /* Return to the previous text mod state.
          * ex: %C ... %B ... % ... %
          *                   ^
@@ -154,8 +198,12 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, modifier_t
          *                       type: CENTER instead of BOLD.
          */
         (*c)++; /* Passing the '%' character. */
-
+#ifndef NO_PANGO
         get_characters(cr, c, &data, &data_length, line_length, font_description);
+#else
+        get_characters_cairo(cr, c, &data, &data_length, line_length);
+#endif
+
         if (modifiers_array_length)
             modifiers_array_length--;
         set_new_size(modifiers_array, modifiers_array_length);
@@ -178,7 +226,12 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, modifier_t
     } else {
       data = *c;
     }
+#ifndef NO_PANGO
     get_characters(cr, c, &data, &data_length, line_length, font_description);
+#else
+    get_characters_cairo(cr, c, &data, &data_length, line_length);
+#endif
+
   }
   return (draw_t){ type, *modifiers_array, modifiers_array_length, data, data_length };
 }

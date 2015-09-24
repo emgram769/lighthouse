@@ -126,6 +126,7 @@ static uint32_t draw_text(cairo_t *cr, draw_t *charac, uint32_t line_width, offs
           case BOLD:
               pango_font_description_set_weight(font_description, PANGO_WEIGHT_BOLD);
               break;
+          case NONE:
           default:
               break;
       }
@@ -159,30 +160,31 @@ static uint32_t draw_text(cairo_t *cr, draw_t *charac, uint32_t line_width, offs
  * @param foreground The color of the text.
  * @return The advance in the x direction.
  */
-static uint32_t draw_text(cairo_t *cr, const char *text, offset_t offset, color_t *foreground, weight, uint32_t font_size) {
+static uint32_t draw_text(cairo_t *cr, draw_t *charac, uint32_t line_width, offset_t offset, color_t *foreground, uint32_t font_size) {
   /* Checking every previous modifier and setting up the parameter. */
   cairo_font_weight_t weight = CAIRO_FONT_WEIGHT_NORMAL;
   for (uint32_t i=0; i < charac->modifiers_array_length; i++) {
       switch ((charac->modifiers_array)[i]) {
-          case CENTER:
+          case CENTER: ;
               uint32_t tmp = offset.x;
               offset.x += (line_width - tmp - charac->data_length) / 2;
               break;
           case BOLD:
               weight = CAIRO_FONT_WEIGHT_BOLD;
               break;
+          case NONE:
           default:
               break;
       }
   }
 
   cairo_text_extents_t extents;
-  cairo_text_extents(cr, text, &extents);
+  cairo_text_extents(cr, charac->data, &extents);
   cairo_move_to(cr, offset.x, offset.y);
   cairo_set_source_rgb(cr, foreground->r, foreground->g, foreground->b);
   cairo_select_font_face(cr, settings.font_name, CAIRO_FONT_SLANT_NORMAL, weight);
   cairo_set_font_size(cr, font_size);
-  cairo_show_text(cr, text);
+  cairo_show_text(cr, charac->data);
   return extents.x_advance;
 }
 #endif
@@ -217,8 +219,8 @@ static inline void get_new_size(uint32_t width, uint32_t height, uint32_t win_si
  * @param charac Characteristics of the image
  *      (will contain the option (center,...) and filename)
  * @param Current offset in the line/desc, used to know the image position.
- * @param win_size_x Width of the window.
- * @param win_size_y Height of the window.
+ * @param win_size_x Width of the drawable part of the window.
+ * @param win_size_y Height of the drawable part of the window.
  * @param format a reference to a image_format_t to change directly the values.
  * @return The advance in the x direction.
  */
@@ -245,6 +247,7 @@ static void draw_image_with_gdk(cairo_t *cr, draw_t *charac, offset_t *offset, u
               offset->x += (win_size_x - format->width) / 2;
               break;
           case BOLD:
+          case NONE:
           default:
               break;
       }
@@ -288,8 +291,8 @@ cairo_surface_t * scale_surface (cairo_surface_t *surface, int width, int height
  * @param charac Characteristics of the image
  *      (will contain the option (center,...) and filename)
  * @param Current offset in the line/desc, used to know the image position.
- * @param win_size_x Width of the window.
- * @param win_size_y Height of the window.
+ * @param win_size_x Width of the drawable part of the window.
+ * @param win_size_y Height of the drawable part of the window.
  * @param format a reference to a image_format_t.
  * @return The advance in the x direction.
  */
@@ -306,6 +309,7 @@ static void draw_png(cairo_t *cr, draw_t *charac, offset_t *offset, uint32_t win
               offset->x += (win_size_x - format->width) / 2;
               break;
           case BOLD:
+          case NONE:
           default:
               break;
       }
@@ -326,8 +330,8 @@ static void draw_png(cairo_t *cr, draw_t *charac, offset_t *offset, uint32_t win
       debug("Resizing the image to %ix%i (prop = %f)\n", format->width, format->height, prop);
   }
 
-  cairo_set_source_surface(cr, img, offset->x, offset.image_y);
-  cairo_mask_surface(cr, img, offset->x, offset.image_y);
+  cairo_set_source_surface(cr, img, offset->x, offset->image_y);
+  cairo_mask_surface(cr, img, offset->x, offset->image_y);
 }
 #endif
 
@@ -337,8 +341,8 @@ static void draw_png(cairo_t *cr, draw_t *charac, offset_t *offset, uint32_t win
  * @param charac Characteristics of the image to pass in the image draw function
  *      (will contain the option (center,...) and filename).
  * @param Current offset in the line/desc, used to know the image position.
- * @param win_size_x Width of the window.
- * @param win_size_y Height of the window.
+ * @param win_size_x Width of the drawable part of the window.
+ * @param win_size_y Height of the drawable part of the window.
  * @return The advance in the x direction.
  */
 static image_format_t draw_image(cairo_t *cr, draw_t *charac, offset_t offset, uint32_t win_size_x, uint32_t win_size_y) {
@@ -448,7 +452,7 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
             pango_font_description_set_weight(font_description, PANGO_WEIGHT_NORMAL);
             offset.x += draw_text(cr, &d, settings.width - offset.x, offset, foreground, font_description);
 #else
-            offset.x += draw_text(cr, &d, offset, foreground, settings.font_size);
+            offset.x += draw_text(cr, &d, settings.width - offset.x, offset, foreground, settings.font_size);
 #endif
             break;
     }
@@ -499,7 +503,7 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
 #ifndef NO_PANGO
     draw_t d = parse_result_line(cr, &c, settings.desc_size + settings.width - offset.x, &modifiers_array, font_description);
 #else
-    draw_t d = parse_result_line(cr, &c, settings.width - offset.x, previous_result, &modifiers_array);
+    draw_t d = parse_result_line(cr, &c, settings.width - offset.x, &modifiers_array);
 #endif
     char saved = *c;
     *c = '\0';
@@ -537,7 +541,7 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
         pango_font_description_set_weight(font_description, PANGO_WEIGHT_NORMAL);
         offset.x += draw_text(cr, &d, settings.width + settings.desc_size - offset.x, offset, foreground, font_description);
 #else
-        offset.x += draw_text(cr, &d, offset, foreground, settings.font_size);
+        offset.x += draw_text(cr, &d, settings.width + settings.desc_size - offset.x, offset, foreground, settings.font_size);
 #endif
         break;
     }
