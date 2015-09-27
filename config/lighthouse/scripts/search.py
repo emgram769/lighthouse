@@ -28,7 +28,7 @@ def searx(query, settings):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("query")
-    parser.add_argument("-number_of_output", default=2, type=int)
+    parser.add_argument("--number_of_output", default=2, type=int)
     settings = parser.parse_args()
 
     print(searx(settings.query, settings))

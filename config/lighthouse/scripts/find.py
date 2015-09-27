@@ -61,7 +61,7 @@ def find(query, settings):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("query")
-    parser.add_argument("-number_of_output", default=3, type=int)
-    parser.add_argument("-term", default="urvxt", type=str)
+    parser.add_argument("--number_of_output", default=3, type=int)
+    parser.add_argument("--term", default="urvxt", type=str)
     settings = parser.parse_args()
     print(find(settings.query, settings))
