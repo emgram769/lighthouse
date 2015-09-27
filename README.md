@@ -98,7 +98,8 @@ To create multiple results simply chain them together: `{ title1 | action1 }{ ti
 
 * There is also image support in the form `{ %Ifile.png% <- an image! | feh file.png }`.
 To use `%` as a character, escape it with `\%`.
-Currently only PNG images are supported.
+Currently only PNG images are supported if the program is compiled without GDK
+support.
 
 * To go to the next line (in description window) use `%N`
 
@@ -106,7 +107,7 @@ Currently only PNG images are supported.
 
 * To format your text in bold use `%B text... %`
 
-* To center a little portion of text `%C text... %`
+* To center text/image `%C ... %`
 
 Other ways to use lighthouse
 ---
