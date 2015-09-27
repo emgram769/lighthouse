@@ -48,7 +48,7 @@ def make_commands(scripts_dict):
          "foo": "bar"
          }
     To transform it like this:
-        "location" -foo bar
+        "location" --foo bar
     So remote script can parse the arguments.
     """
     res = []
@@ -59,7 +59,7 @@ def make_commands(scripts_dict):
             if charac == "location":
                 program_name = os.path.expanduser(arg)
             else:
-                program_flags += "-%s %s " % (charac, arg)
+                program_flags += "--%s %s " % (charac, arg)
         if program_name is None:
             # Script location should be always specified by the user.
             raise LocationNotFoundError
