@@ -228,7 +228,7 @@ draw_t parse_result_line(cairo_t *cr, char **c, uint32_t line_length, modifier_t
         if (modifiers_array_length)
             modifiers_array_length--;
         else
-            debug("Error in the result text: '%' wrongly placed.");
+            debug("Error in the result text: '%%' wrongly placed.");
         set_new_size(modifiers_array, modifiers_array_length);
         break;
     }
