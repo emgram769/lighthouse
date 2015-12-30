@@ -383,6 +383,28 @@ cleanup:
   return 0;
 }
 
+/* @brief Parses a color and writes it to the settings struct.
+ *
+ * @param val Color value to parse.
+ * @param color Pointer to settings color we will write to.
+ * @return Void.
+ */
+static void set_color_setting(char* val, color_t* color) {
+    if (val[0] == '#') {
+        char *str_end;
+        int hex_color = (int)strtol(val+1, &str_end, 16);
+
+        if (*str_end != val[1]) {
+            color->r = ((hex_color >> 16) & 0xFF) / 255.0;
+            color->g = ((hex_color >> 8) & 0xFF) / 255.0;
+            color->b = ((hex_color) & 0xFF) / 255.0;
+        }
+    } else {
+        sscanf(val, "%f,%f,%f", &(color->r), &(color->g), &(color->b));
+    }
+    return;
+}
+
 /* @brief Updates the settings global struct with the passed in parameters.
  *
  * @param param The name of the parameter to be updated.
@@ -417,17 +439,17 @@ static void set_setting(char *param, char *val) {
   } else if (!strcmp("cmd", param)) {
     settings.cmd = val;
   } else if (!strcmp("query_fg", param)) {
-    sscanf(val, "%f,%f,%f", &settings.query_fg.r, &settings.query_fg.g, &settings.query_fg.b);
+      set_color_setting(val, &settings.query_fg);
   } else if (!strcmp("query_bg", param)) {
-    sscanf(val, "%f,%f,%f", &settings.query_bg.r, &settings.query_bg.g, &settings.query_bg.b);
+      set_color_setting(val, &settings.query_bg);
   } else if (!strcmp("result_fg", param)) {
-    sscanf(val, "%f,%f,%f", &settings.result_fg.r, &settings.result_fg.g, &settings.result_fg.b);
+      set_color_setting(val, &settings.result_fg);
   } else if (!strcmp("result_bg", param)) {
-    sscanf(val, "%f,%f,%f", &settings.result_bg.r, &settings.result_bg.g, &settings.result_bg.b);
+      set_color_setting(val, &settings.result_bg);
   } else if (!strcmp("highlight_fg", param)) {
-    sscanf(val, "%f,%f,%f", &settings.highlight_fg.r, &settings.highlight_fg.g, &settings.highlight_fg.b);
+      set_color_setting(val, &settings.highlight_fg);
   } else if (!strcmp("highlight_bg", param)) {
-    sscanf(val, "%f,%f,%f", &settings.highlight_bg.r, &settings.highlight_bg.g, &settings.highlight_bg.b);
+      set_color_setting(val, &settings.highlight_bg);
   } else if (!strcmp("desktop", param)) {
     sscanf(val, "%u", &settings.desktop);
   } else if (!strcmp("dock_mode", param)) {
