@@ -82,8 +82,8 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
 
   /* if the cursor would be off the back end, set its position to 0 and scroll text instead */
   if(cursor_x < 0) {
-      offset.x -= (cursor_x-3);
-      cursor_x = 0;
+    offset.x -= (cursor_x-3);
+    cursor_x = 0;
   }
 
   /* Draw the text. */
@@ -121,17 +121,17 @@ static void draw_typed_line(cairo_t *cr, char *text, uint32_t line, uint32_t cur
 static uint32_t draw_text(cairo_t *cr, draw_t *charac, uint32_t line_width, offset_t *offset, color_t *foreground, PangoFontDescription *font_description) {
   /* Checking every previous modifier and setting up the parameter. */
   for (uint32_t i=0; i < charac->modifiers_array_length; i++) {
-      switch ((charac->modifiers_array)[i]) {
-          case CENTER:
-              offset->x += (line_width - charac->data_length) / 2;
-              break;
-          case BOLD:
-              pango_font_description_set_weight(font_description, PANGO_WEIGHT_BOLD);
-              break;
-          case NONE:
-          default:
-              break;
-      }
+    switch ((charac->modifiers_array)[i]) {
+      case CENTER:
+        offset->x += (line_width - charac->data_length) / 2;
+        break;
+      case BOLD:
+        pango_font_description_set_weight(font_description, PANGO_WEIGHT_BOLD);
+        break;
+      case NONE:
+      default:
+        break;
+    }
   }
 
   /* Drawing the text */
@@ -170,18 +170,18 @@ static uint32_t draw_text(cairo_t *cr, draw_t *charac, uint32_t line_width, offs
   /* Checking every previous modifier and setting up the parameter. */
   cairo_font_weight_t weight = CAIRO_FONT_WEIGHT_NORMAL;
   for (uint32_t i=0; i < charac->modifiers_array_length; i++) {
-      switch ((charac->modifiers_array)[i]) {
-          case CENTER: ;
-              uint32_t tmp = offset->x;
-              offset->x += (line_width - tmp - charac->data_length) / 2;
-              break;
-          case BOLD:
-              weight = CAIRO_FONT_WEIGHT_BOLD;
-              break;
-          case NONE:
-          default:
-              break;
-      }
+    switch ((charac->modifiers_array)[i]) {
+      case CENTER:;
+        uint32_t tmp = offset->x;
+        offset->x += (line_width - tmp - charac->data_length) / 2;
+        break;
+      case BOLD:
+        weight = CAIRO_FONT_WEIGHT_BOLD;
+        break;
+      case NONE:
+      default:
+        break;
+    }
   }
 
   cairo_text_extents_t extents;
@@ -208,14 +208,14 @@ static uint32_t draw_text(cairo_t *cr, draw_t *charac, uint32_t line_width, offs
  */
 static inline void get_new_size(uint32_t width, uint32_t height, uint32_t win_size_x, uint32_t win_size_y, image_format_t *format) {
   if (width > win_size_x || height > win_size_y) {
-      /* Formatting only the big picture. */
-      float prop = min((float)win_size_x / width,
-              (float)win_size_y / height);
-      /* Finding the best proportion to fit the picture. */
-      format->width = prop * width;
-      format->height = prop * height;
+    /* Formatting only the big picture. */
+    float prop = min((float)win_size_x / width,
+        (float)win_size_y / height);
+    /* Finding the best proportion to fit the picture. */
+    format->width = prop * width;
+    format->height = prop * height;
 
-      debug("Resizing the image to %ix%i (prop = %f)\n", format->width, format->height, prop);
+    debug("Resizing the image to %ix%i (prop = %f)\n", format->width, format->height, prop);
   }
 }
 
@@ -236,9 +236,9 @@ static void draw_image_with_gdk(cairo_t *cr, draw_t *charac, offset_t *offset, u
 
   image = gdk_pixbuf_new_from_file(charac->data, &error);
   if (error != NULL) {
-      debug("Image opening failed (tried to open %s): %s\n", charac->data, error->message);
-      g_error_free(error);
-      return ;
+    debug("Image opening failed (tried to open %s): %s\n", charac->data, error->message);
+    g_error_free(error);
+    return ;
   }
 
   get_new_size(gdk_pixbuf_get_width(image), gdk_pixbuf_get_height(image), win_size_x, win_size_y, format);
@@ -248,15 +248,15 @@ static void draw_image_with_gdk(cairo_t *cr, draw_t *charac, offset_t *offset, u
 
   /* Checking every previous modifier and setting up the parameter. */
   for (uint32_t i=0; i < charac->modifiers_array_length; i++) {
-      switch ((charac->modifiers_array)[i]) {
-          case CENTER:
-              offset->x += (win_size_x - format->width) / 2;
-              break;
-          case BOLD:
-          case NONE:
-          default:
-              break;
-      }
+    switch ((charac->modifiers_array)[i]) {
+      case CENTER:
+        offset->x += (win_size_x - format->width) / 2;
+        break;
+      case BOLD:
+      case NONE:
+      default:
+        break;
+    }
   }
 
   gdk_cairo_set_source_pixbuf(cr, resize, offset->x, offset->image_y);
@@ -273,9 +273,9 @@ static void draw_image_with_gdk(cairo_t *cr, draw_t *charac, offset_t *offset, u
  * @param new_height The height of the image when resized.
  */
 cairo_surface_t * scale_surface (cairo_surface_t *surface, int width, int height,
-                int new_width, int new_height) {
+    int new_width, int new_height) {
   cairo_surface_t *new_surface = cairo_surface_create_similar(surface,
-                    CAIRO_CONTENT_COLOR_ALPHA, new_width, new_height);
+      CAIRO_CONTENT_COLOR_ALPHA, new_width, new_height);
   cairo_t *cr = cairo_create (new_surface);
 
   cairo_scale (cr, (double)new_width / width, (double)new_height / height);
@@ -310,30 +310,30 @@ static void draw_png(cairo_t *cr, draw_t *charac, offset_t *offset, uint32_t win
 
   /* Checking every previous modifier and setting up the parameter. */
   for (uint32_t i=0; i < charac->modifiers_array_length; i++) {
-      switch ((charac->modifiers_array)[i]) {
-          case CENTER:
-              offset->x += (win_size_x - format->width) / 2;
-              break;
-          case BOLD:
-          case NONE:
-          default:
-              break;
-      }
+    switch ((charac->modifiers_array)[i]) {
+      case CENTER:
+        offset->x += (win_size_x - format->width) / 2;
+        break;
+      case BOLD:
+      case NONE:
+      default:
+        break;
+    }
   }
 
   if (format->width > win_size_x || format->height > win_size_y) {
-      /* Formatting only the big picture. */
-      float prop = min((float)win_size_x / (*format).width,
-              (float)win_size_y / (*format).height);
-      /* Finding the best proportion to fit the picture. */
-      image_format_t new_format;
-      new_format.width = prop * format->width;
-      new_format.height = prop * format->height;
+    /* Formatting only the big picture. */
+    float prop = min((float)win_size_x / (*format).width,
+        (float)win_size_y / (*format).height);
+    /* Finding the best proportion to fit the picture. */
+    image_format_t new_format;
+    new_format.width = prop * format->width;
+    new_format.height = prop * format->height;
 
-      img = scale_surface(img, format->width, format->height,
-              new_format.width, new_format.height);
-      *format = new_format;
-      debug("Resizing the image to %ix%i (prop = %f)\n", format->width, format->height, prop);
+    img = scale_surface(img, format->width, format->height,
+        new_format.width, new_format.height);
+    *format = new_format;
+    debug("Resizing the image to %ix%i (prop = %f)\n", format->width, format->height, prop);
   }
 
   cairo_set_source_surface(cr, img, offset->x, offset->image_y);
@@ -373,25 +373,25 @@ static image_format_t draw_image(cairo_t *cr, draw_t *charac, offset_t offset, u
     /* https://en.wikipedia.org/wiki/Magic_number_%28programming%29#Magic_numbers_in_files */
 #ifndef NO_GDK
     case 137:
-        debug("PNG found\n");
-        draw_image_with_gdk(cr, charac, &offset, win_size_x, win_size_y, &format);
-        break;
+      debug("PNG found\n");
+      draw_image_with_gdk(cr, charac, &offset, win_size_x, win_size_y, &format);
+      break;
     case 255:
-        debug("JPEG found\n");
-        draw_image_with_gdk(cr, charac, &offset, win_size_x, win_size_y, &format);
-        break;
+      debug("JPEG found\n");
+      draw_image_with_gdk(cr, charac, &offset, win_size_x, win_size_y, &format);
+      break;
     case 47:
-        debug("GIF found\n");
-        draw_image_with_gdk(cr, charac, &offset, win_size_x, win_size_y, &format);
-        break;
+      debug("GIF found\n");
+      draw_image_with_gdk(cr, charac, &offset, win_size_x, win_size_y, &format);
+      break;
 #else
     case 137:
-        draw_png(cr, charac, &offset, win_size_x, win_size_y, &format);
-        break;
+      draw_png(cr, charac, &offset, win_size_x, win_size_y, &format);
+      break;
 #endif
     default:
-        debug("Unknown image format found: %s\n", charac->data);
-        break;
+      debug("Unknown image format found: %s\n", charac->data);
+      break;
   }
   fclose(picture);
   return format;
@@ -440,27 +440,27 @@ static void draw_line(cairo_t *cr, const char *text, uint32_t line, color_t *for
 #endif
     /* Checking if there are still char to draw. */ // TODO
     if (d.data == NULL)
-        break;
+      break;
 
     char saved = *c;
     *c = '\0';
     /* Checking for the type of "d" and then if it's relevant apply the modfiers. */
     switch (d.type) {
-        case DRAW_LINE:
-        case NEW_LINE:
-            break;
-        case DRAW_IMAGE:
-            offset.x += draw_image(cr, &d, offset, settings.width - offset.x, settings.height).width;
-            break;
-        case DRAW_TEXT:
-        default:
+      case DRAW_LINE:
+      case NEW_LINE:
+        break;
+      case DRAW_IMAGE:
+        offset.x += draw_image(cr, &d, offset, settings.width - offset.x, settings.height).width;
+        break;
+      case DRAW_TEXT:
+      default:
 #ifndef NO_PANGO
-            pango_font_description_set_weight(font_description, PANGO_WEIGHT_NORMAL);
-            offset.x += draw_text(cr, &d, settings.width - offset.x, &offset, foreground, font_description);
+        pango_font_description_set_weight(font_description, PANGO_WEIGHT_NORMAL);
+        offset.x += draw_text(cr, &d, settings.width - offset.x, &offset, foreground, font_description);
 #else
-            offset.x += draw_text(cr, &d, settings.width - offset.x, &offset, foreground, settings.font_size);
+        offset.x += draw_text(cr, &d, settings.width - offset.x, &offset, foreground, settings.font_size);
 #endif
-            break;
+        break;
     }
     *c = saved;
   }
@@ -484,7 +484,7 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
   cairo_set_source_rgb(cr, background->r, background->g, background->b);
   uint32_t desc_height = settings.height*(global.result_count+1);
   cairo_rectangle(cr, settings.width + 2, 0,
-          settings.width+settings.desc_size, desc_height);
+      settings.width+settings.desc_size, desc_height);
   cairo_stroke_preserve(cr);
   cairo_fill(cr);
   offset_t offset = {settings.width + 2, global.real_desc_font_size, 0};
@@ -516,7 +516,7 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
 
     /* Checking for the type of "d" and then if it's relevant apply the modfiers. */
     switch (d.type) {
-      case DRAW_IMAGE: ;
+      case DRAW_IMAGE:;
         image_format_t format;
         format = draw_image(cr, &d, offset, settings.desc_size - (offset.x - settings.width), desc_height - offset.image_y);
         offset.image_y += format.height;
@@ -553,10 +553,10 @@ static void draw_desc(cairo_t *cr, const char *text, color_t *foreground, color_
     }
     *c = saved;
     if ((offset.x + settings.desc_font_size) > (settings.width + settings.desc_size)) {
-        /* Checking if it's gonna write out of the square space. */
-        offset.x = settings.width;
-        offset.y += global.real_desc_font_size;
-        offset.image_y += global.real_desc_font_size;
+      /* Checking if it's gonna write out of the square space. */
+      offset.x = settings.width;
+      offset.y += global.real_desc_font_size;
+      offset.image_y += global.real_desc_font_size;
     }
   }
 #ifndef NO_PANGO
@@ -581,44 +581,44 @@ void draw_result_text(xcb_connection_t *connection, xcb_window_t window, cairo_t
   uint32_t display_results = min(global.result_count, max_results);
   /* Set the offset. */
   if (global.result_count <= max_results) {
-      /* Sometime you use an offset from a previous query and then you send another query
-       * to your script but get only 2 response, you need to reset the offset to 0
-       */
-      global.result_offset = 0;
+    /* Sometime you use an offset from a previous query and then you send another query
+     * to your script but get only 2 response, you need to reset the offset to 0
+     */
+    global.result_offset = 0;
   } else if (global.result_count - max_results < global.result_offset) {
-      /* When we need to adjust the offset. */
-      global.result_offset = global.result_count - max_results;
+    /* When we need to adjust the offset. */
+    global.result_offset = global.result_count - max_results;
   } else if ((global.result_offset + display_results) < (global.result_highlight + 1)) {
-      /* Change the offset to match the highlight when scrolling down. */
-      global.result_offset = global.result_highlight - (display_results - 1);
-      display_results = global.result_count - global.result_offset;
+    /* Change the offset to match the highlight when scrolling down. */
+    global.result_offset = global.result_highlight - (display_results - 1);
+    display_results = global.result_count - global.result_offset;
   } else if (global.result_offset > global.result_highlight) {
-      /* Used when scrolling up. */
-      global.result_offset = global.result_highlight;
+    /* Used when scrolling up. */
+    global.result_offset = global.result_highlight;
   }
 
   if ((global.result_highlight < global.result_count) &&
-          results[global.result_highlight].desc) {
-      if (settings.auto_center) {
-        uint32_t values[] = { global.win_x_pos_with_desc, global.win_y_pos };
-        xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
-      }
+      results[global.result_highlight].desc) {
+    if (settings.auto_center) {
+      uint32_t values[] = { global.win_x_pos_with_desc, global.win_y_pos };
+      xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
+    }
 
-      uint32_t new_height = min(settings.height * (global.result_count + 1), settings.max_height);
-      uint32_t values[] = { settings.width+settings.desc_size, new_height };
-      xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
-      cairo_xcb_surface_set_size(surface, settings.width + settings.desc_size, new_height);
-      draw_desc(cr, results[global.result_highlight].desc, &settings.highlight_fg, &settings.highlight_bg);
+    uint32_t new_height = min(settings.height * (global.result_count + 1), settings.max_height);
+    uint32_t values[] = { settings.width+settings.desc_size, new_height };
+    xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
+    cairo_xcb_surface_set_size(surface, settings.width + settings.desc_size, new_height);
+    draw_desc(cr, results[global.result_highlight].desc, &settings.highlight_fg, &settings.highlight_bg);
   } else {
-      if (settings.auto_center) {
-        uint32_t values[] = { global.win_x_pos, global.win_y_pos };
-        xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
-      }
+    if (settings.auto_center) {
+      uint32_t values[] = { global.win_x_pos, global.win_y_pos };
+      xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
+    }
 
-      uint32_t new_height = min(settings.height * (global.result_count + 1), settings.max_height);
-      uint32_t values[] = { settings.width, new_height };
-      xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
-      cairo_xcb_surface_set_size(surface, settings.width, new_height);
+    uint32_t new_height = min(settings.height * (global.result_count + 1), settings.max_height);
+    uint32_t values[] = { settings.width, new_height };
+    xcb_configure_window (connection, window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, values);
+    cairo_xcb_surface_set_size(surface, settings.width, new_height);
   }
 
   for (index = global.result_offset, line = 1; index < global.result_offset + display_results; index++, line++) {

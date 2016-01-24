@@ -105,15 +105,15 @@ static inline int32_t check_xcb_cookie(xcb_void_cookie_t cookie, xcb_connection_
  *      xcb_key_release_event_t k ... ->event;
  * */
 uint8_t get_modifiers (uint32_t mask) {
-    uint8_t modifier = 0;
-    if (mask) {
-        ++modifier;
-        while (!(mask & 1)) {
-            mask >>= 1;
-            ++modifier;
-        }
+  uint8_t modifier = 0;
+  if (mask) {
+    ++modifier;
+    while (!(mask & 1)) {
+      mask >>= 1;
+      ++modifier;
     }
-    return modifier;
+  }
+  return modifier;
 }
 
 
@@ -123,11 +123,11 @@ uint8_t get_modifiers (uint32_t mask) {
  * @param Copy of the global.result_highlight for the ease of use.
  */
 static void get_next_non_title(uint32_t *highlight) {
+  (*highlight)++;
+  while ((*highlight) < global.result_count && !global.results[*highlight].action) {
+    /* Searching for the next result with an action.*/
     (*highlight)++;
-    while ((*highlight) < global.result_count && !global.results[*highlight].action) {
-        /* Searching for the next result with an action.*/
-        (*highlight)++;
-    }
+  }
 }
 
 /* @brief Set the global.result_highlight on the next line
@@ -137,14 +137,14 @@ static void get_next_non_title(uint32_t *highlight) {
  * @param Copy of the global.result_highlight for the ease of use.
  */
 static void get_next_line(uint32_t *highlight) {
-      get_next_non_title(highlight);
-      if(*highlight == global.result_count) {
-          /* If the last result is a title go on the top. */
-          *highlight = -1;
-          global.result_offset = 0;
-          get_next_non_title(highlight);
-      }
-      global.result_highlight = *highlight;
+  get_next_non_title(highlight);
+  if(*highlight == global.result_count) {
+    /* If the last result is a title go on the top. */
+    *highlight = -1;
+    global.result_offset = 0;
+    get_next_non_title(highlight);
+  }
+  global.result_highlight = *highlight;
 }
 
 /* @brief Set the highlight below the next title present in global.results
@@ -172,15 +172,15 @@ static void next_title(uint32_t *highlight) {
  * @param Copy of the global.result_highlight for the ease of use.
  */
 static void get_previous_non_title(uint32_t *highlight) {
+  (*highlight)--;
+  while ((*highlight) < global.result_count && !global.results[*highlight].action) {
+    /* Searching for the previous result with an action.
+     *
+     * *(*highlight) < global.result_count is used because I use highlight is
+     * unsigned so it when it hit "-1", it's bigger than global.result_count
+     */
     (*highlight)--;
-    while ((*highlight) < global.result_count && !global.results[*highlight].action) {
-        /* Searching for the previous result with an action.
-         *
-         * *(*highlight) < global.result_count is used because I use highlight is
-         * unsigned so it when it hit "-1", it's bigger than global.result_count
-         */
-        (*highlight)--;
-    }
+  }
 }
 
 /* @brief Set the global.result_highlight on the previous line
@@ -190,13 +190,13 @@ static void get_previous_non_title(uint32_t *highlight) {
  * @param Copy of the global.result_highlight for the ease of use.
  */
 static void get_previous_line(uint32_t *highlight) {
-    get_previous_non_title(highlight);
+  get_previous_non_title(highlight);
 
-    if(*highlight == (uint32_t) - 1) {
-        *highlight = global.result_count;
-        get_previous_non_title(highlight);
-    }
-    global.result_highlight = *highlight;
+  if(*highlight == (uint32_t) - 1) {
+    *highlight = global.result_count;
+    get_previous_non_title(highlight);
+  }
+  global.result_highlight = *highlight;
 }
 
 /* @brief Set the highlight above the previous title present in global.results
@@ -204,18 +204,18 @@ static void get_previous_line(uint32_t *highlight) {
  * @param Copy of the global.result_highlight for the ease of use.
  */
 static void previous_title(uint32_t *highlight) {
+  while (*highlight > 0 && global.results[*highlight].action) {
+    (*highlight)--;
+  }
+
+  if (*highlight == 0 && global.results[*highlight].action) {
+    /* highlight hit the top . */
+    *highlight = global.result_count - 1;
     while (*highlight > 0 && global.results[*highlight].action) {
       (*highlight)--;
     }
-
-    if (*highlight == 0 && global.results[*highlight].action) {
-        /* highlight hit the top . */
-        *highlight = global.result_count - 1;
-        while (*highlight > 0 && global.results[*highlight].action) {
-          (*highlight)--;
-        }
-    }
-    get_previous_line(highlight);
+  }
+  get_previous_line(highlight);
 }
 
 
@@ -228,7 +228,7 @@ static void previous_title(uint32_t *highlight) {
  * @param query_buffer The string of the current query (what is typed).
  * @param query_index A reference to the current length of the query.
  * @param query_cursor_index A reference to the current index of the cursor
-          in the query.
+ in the query.
  * @param key The key enetered.
  * @param connection A connection to the Xorg server.
  * @param cairo_context A cairo context for drawing to the screen.
@@ -262,106 +262,106 @@ static inline int32_t process_key_stroke(xcb_window_t window, char *query_buffer
     previous_title(&highlight);
     draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
   } else {
-  switch (key) {
-    case 65293: /* Enter. */
-      if (global.results && global.result_highlight < global.result_count) {
-        printf("%s", global.results[global.result_highlight].action);
-        goto cleanup;
-      }
-      break;
-    case 65471: /* F2 */
-      next_title(&highlight);
-      draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
-      break;
-    case 65472: /* F3 */
-      previous_title(&highlight);
-      draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
-      break;
-    case 65361: /* Left. */
-      if (*query_cursor_index > 0) {
-        (*query_cursor_index)--;
-        redraw = 1;
-      }
-      break;
-    case 65363: /* Right. */
-      if (*query_cursor_index < *query_index) {
-        (*query_cursor_index)++;
-        redraw = 1;
-      }
-      break;
-    case 65362: /* Up. */
-      if (!global.result_count)
+    switch (key) {
+      case 65293: /* Enter. */
+        if (global.results && global.result_highlight < global.result_count) {
+          printf("%s", global.results[global.result_highlight].action);
+          goto cleanup;
+        }
+        break;
+      case 65471: /* F2 */
+        next_title(&highlight);
+        draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
+        break;
+      case 65472: /* F3 */
+        previous_title(&highlight);
+        draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
+        break;
+      case 65361: /* Left. */
+        if (*query_cursor_index > 0) {
+          (*query_cursor_index)--;
+          redraw = 1;
+        }
+        break;
+      case 65363: /* Right. */
+        if (*query_cursor_index < *query_index) {
+          (*query_cursor_index)++;
+          redraw = 1;
+        }
+        break;
+      case 65362: /* Up. */
+        if (!global.result_count)
           break;
-      if (highlight) { /* Avoid segfault when highlight on the top. */
-        old_pos = highlight;
-        get_previous_non_title(&highlight);
-        if (!global.results[highlight].action) {
+        if (highlight) { /* Avoid segfault when highlight on the top. */
+          old_pos = highlight;
+          get_previous_non_title(&highlight);
+          if (!global.results[highlight].action) {
             /* If it's a title it mean the get_previous_non_title function
-            * found nothing and hit the top.
-            */
+             * found nothing and hit the top.
+             */
             highlight = old_pos; /* To not let the highlight point on a title. */
             if (global.result_offset)
-                global.result_offset--;
+              global.result_offset--;
+          }
+          global.result_highlight = highlight;
+          draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
         }
-        global.result_highlight = highlight;
-        draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
-      }
-      break;
-    case 65364: /* Down. */
-      if (!global.result_count)
+        break;
+      case 65364: /* Down. */
+        if (!global.result_count)
           break;
-      if (highlight < global.result_count - 1) {
-       old_pos = highlight;
-       get_next_non_title(&highlight);
-       if (highlight == global.result_count) {
-           /* If no other result with an action can be found, it just inc the
-            * the offset so it can show the hidden title and make the highlight to the
-            * previous non_title.
-            * NB: If the offset limit is exceed, it's handled by the draw_result_text function.
-            */
+        if (highlight < global.result_count - 1) {
+          old_pos = highlight;
+          get_next_non_title(&highlight);
+          if (highlight == global.result_count) {
+            /* If no other result with an action can be found, it just inc the
+             * the offset so it can show the hidden title and make the highlight to the
+             * previous non_title.
+             * NB: If the offset limit is exceed, it's handled by the draw_result_text function.
+             */
             highlight = old_pos;
             global.result_offset++;
-       }
-       global.result_highlight = highlight;
-       draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
-      }
-      break;
-    case 65289: /* Tab. */
-      if (!global.result_count)
+          }
+          global.result_highlight = highlight;
+          draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
+        }
+        break;
+      case 65289: /* Tab. */
+        if (!global.result_count)
           break;
-      get_next_line(&highlight);
-      draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
-      break;
-    case 65056: /* Shift Tab */
-      if (!global.result_count)
+        get_next_line(&highlight);
+        draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
+        break;
+      case 65056: /* Shift Tab */
+        if (!global.result_count)
           break;
-      get_previous_line(&highlight);
-      draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
-      break;
-    case 65307: /* Escape. */
-      goto cleanup;
-    case 65288: /* Backspace. */
-      if (*query_index > 0 && *query_cursor_index > 0) {
+        get_previous_line(&highlight);
+        draw_result_text(connection, window, cairo_context, cairo_surface, global.results);
+        break;
+      case 65307: /* Escape. */
+        goto cleanup;
+      case 65288: /* Backspace. */
+        if (*query_index > 0 && *query_cursor_index > 0) {
           memmove(&query_buffer[(*query_cursor_index) - 1], &query_buffer[*query_cursor_index], *query_index - *query_cursor_index + 1);
           (*query_cursor_index)--;
           (*query_index)--;
           query_buffer[(*query_index)] = 0;
           redraw = 1;
           resend = 1;
-      } else if (*query_index == 0 && settings.backspace_exit) { /* Backspace with nothing */
+        } else if (*query_index == 0 && settings.backspace_exit) { /* Backspace with nothing */
           goto cleanup;
-      }
-      break;
-    default:
-      if (isprint((char)key) && *query_index < MAX_QUERY) {
+        }
+        break;
+      default:
+        if (isprint((char)key) && *query_index < MAX_QUERY) {
           memmove(&query_buffer[(*query_cursor_index) + 1], &query_buffer[*query_cursor_index], *query_index - *query_cursor_index + 1);
           query_buffer[(*query_cursor_index)++] = key;
           (*query_index)++;
           redraw = 1;
           resend = 1;
-      }
-      break;
-  }
+        }
+        break;
+    }
   }
 
   if (redraw) {
@@ -390,19 +390,19 @@ cleanup:
  * @return Void.
  */
 static void set_color_setting(char* val, color_t* color) {
-    if (val[0] == '#') {
-        char *str_end;
-        int hex_color = (int)strtol(val+1, &str_end, 16);
+  if (val[0] == '#') {
+    char *str_end;
+    int hex_color = (int)strtol(val+1, &str_end, 16);
 
-        if (*str_end != val[1]) {
-            color->r = ((hex_color >> 16) & 0xFF) / 255.0;
-            color->g = ((hex_color >> 8) & 0xFF) / 255.0;
-            color->b = ((hex_color) & 0xFF) / 255.0;
-        }
-    } else {
-        sscanf(val, "%f,%f,%f", &(color->r), &(color->g), &(color->b));
+    if (*str_end != val[1]) {
+      color->r = ((hex_color >> 16) & 0xFF) / 255.0;
+      color->g = ((hex_color >> 8) & 0xFF) / 255.0;
+      color->b = ((hex_color) & 0xFF) / 255.0;
     }
-    return;
+  } else {
+    sscanf(val, "%f,%f,%f", &(color->r), &(color->g), &(color->b));
+  }
+  return;
 }
 
 /* @brief Updates the settings global struct with the passed in parameters.
@@ -439,17 +439,17 @@ static void set_setting(char *param, char *val) {
   } else if (!strcmp("cmd", param)) {
     settings.cmd = val;
   } else if (!strcmp("query_fg", param)) {
-      set_color_setting(val, &settings.query_fg);
+    set_color_setting(val, &settings.query_fg);
   } else if (!strcmp("query_bg", param)) {
-      set_color_setting(val, &settings.query_bg);
+    set_color_setting(val, &settings.query_bg);
   } else if (!strcmp("result_fg", param)) {
-      set_color_setting(val, &settings.result_fg);
+    set_color_setting(val, &settings.result_fg);
   } else if (!strcmp("result_bg", param)) {
-      set_color_setting(val, &settings.result_bg);
+    set_color_setting(val, &settings.result_bg);
   } else if (!strcmp("highlight_fg", param)) {
-      set_color_setting(val, &settings.highlight_fg);
+    set_color_setting(val, &settings.highlight_fg);
   } else if (!strcmp("highlight_bg", param)) {
-      set_color_setting(val, &settings.highlight_bg);
+    set_color_setting(val, &settings.highlight_bg);
   } else if (!strcmp("desktop", param)) {
     sscanf(val, "%u", &settings.desktop);
   } else if (!strcmp("dock_mode", param)) {
@@ -738,12 +738,12 @@ int main(int argc, char **argv) {
   values[0] = screen->white_pixel;
   values[1] = settings.dock_mode ? 0 : 1;
   values[2] = XCB_EVENT_MASK_EXPOSURE
-            | XCB_EVENT_MASK_KEY_PRESS
-            | XCB_EVENT_MASK_KEY_RELEASE
-            | XCB_EVENT_MASK_BUTTON_PRESS;
+    | XCB_EVENT_MASK_KEY_PRESS
+    | XCB_EVENT_MASK_KEY_RELEASE
+    | XCB_EVENT_MASK_BUTTON_PRESS;
   xcb_void_cookie_t window_cookie = xcb_create_window_checked(connection,
-    XCB_COPY_FROM_PARENT, window, screen->root, 0, 0, settings.width, settings.height, 0,
-    XCB_WINDOW_CLASS_INPUT_OUTPUT, screen->root_visual, mask, values);
+      XCB_COPY_FROM_PARENT, window, screen->root, 0, 0, settings.width, settings.height, 0,
+      XCB_WINDOW_CLASS_INPUT_OUTPUT, screen->root_visual, mask, values);
 
   if (check_xcb_cookie(window_cookie, connection, "Failed to initialize window.")) {
     exit_code = 1;
@@ -761,9 +761,9 @@ int main(int argc, char **argv) {
     free(atom_reply);
 
     if (settings.dock_mode) {
-        atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_WINDOW_TYPE_DOCK"), "_NET_WM_WINDOW_TYPE_DOCK");
+      atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_WINDOW_TYPE_DOCK"), "_NET_WM_WINDOW_TYPE_DOCK");
     } else {
-        atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_WINDOW_TYPE_DIALOG"), "_NET_WM_WINDOW_TYPE_DIALOG");
+      atom_cookie = xcb_intern_atom(connection, 0, strlen("_NET_WM_WINDOW_TYPE_DIALOG"), "_NET_WM_WINDOW_TYPE_DIALOG");
     }
     atom_reply = xcb_intern_atom_reply(connection, atom_cookie, NULL);
     if (atom_reply) {
@@ -818,9 +818,9 @@ int main(int argc, char **argv) {
   /* Set window properties. */
   char *title = "lighthouse";
   xcb_change_property(connection, XCB_PROP_MODE_REPLACE, window,
-    XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, strlen(title), title);
+      XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, strlen(title), title);
   xcb_change_property(connection, XCB_PROP_MODE_REPLACE, window,
-    XCB_ATOM_WM_CLASS, XCB_ATOM_STRING, 8, strlen(title), title);
+      XCB_ATOM_WM_CLASS, XCB_ATOM_STRING, 8, strlen(title), title);
 
   /* Find the visualtype by iterating through depths. */
   xcb_visualtype_t *visual = NULL;
@@ -896,7 +896,7 @@ int main(int argc, char **argv) {
   /* Center the window */
   /* Assign value for the window position with and without description window */
   global.win_x_pos_with_desc = settings.screen_x + settings.x * settings.screen_width / 100
-      - (settings.width + settings.desc_size) / 2;
+    - (settings.width + settings.desc_size) / 2;
   global.win_x_pos = settings.screen_x + settings.x * settings.screen_width / 100 - settings.width / 2;
   global.win_y_pos  = settings.screen_y + settings.y * settings.screen_height / 100 - settings.height / 2;
 
@@ -918,35 +918,35 @@ int main(int argc, char **argv) {
   while ((event = xcb_wait_for_event(connection))) {
     switch (event->response_type & ~0x80) {
       case XCB_EXPOSE: {
-        /* Get the input focus. */
-        xcb_void_cookie_t focus_cookie = xcb_set_input_focus_checked(connection, XCB_INPUT_FOCUS_POINTER_ROOT, window, XCB_CURRENT_TIME);
-        check_xcb_cookie(focus_cookie, connection, "Failed to grab focus.");
+                         /* Get the input focus. */
+                         xcb_void_cookie_t focus_cookie = xcb_set_input_focus_checked(connection, XCB_INPUT_FOCUS_POINTER_ROOT, window, XCB_CURRENT_TIME);
+                         check_xcb_cookie(focus_cookie, connection, "Failed to grab focus.");
 
-        /* Redraw. */
-        redraw_all(connection, window, cairo_context, cairo_surface, query_string, query_cursor_index);
-        break;
-      }
+                         /* Redraw. */
+                         redraw_all(connection, window, cairo_context, cairo_surface, query_string, query_cursor_index);
+                         break;
+                       }
       case XCB_KEY_PRESS: {
-        break;
-      }
+                            break;
+                          }
       case XCB_KEY_RELEASE: {
-        xcb_key_release_event_t *k = (xcb_key_release_event_t *)event;
-        xcb_keysym_t key = xcb_key_press_lookup_keysym(keysyms, k, k->state & ~XCB_MOD_MASK_2 & ~XCB_MOD_MASK_CONTROL);
-        int32_t ret = process_key_stroke(window, query_string, &query_index, &query_cursor_index, key, k->state, connection, cairo_context, cairo_surface, to_child);
-        if (ret <= 0) {
-          exit_code = ret;
-          goto cleanup;
-        }
-        break;
-      }
+                              xcb_key_release_event_t *k = (xcb_key_release_event_t *)event;
+                              xcb_keysym_t key = xcb_key_press_lookup_keysym(keysyms, k, k->state & ~XCB_MOD_MASK_2 & ~XCB_MOD_MASK_CONTROL);
+                              int32_t ret = process_key_stroke(window, query_string, &query_index, &query_cursor_index, key, k->state, connection, cairo_context, cairo_surface, to_child);
+                              if (ret <= 0) {
+                                exit_code = ret;
+                                goto cleanup;
+                              }
+                              break;
+                            }
       case XCB_EVENT_MASK_BUTTON_PRESS: {
-        /* Get the input focus. */
-        xcb_void_cookie_t focus_cookie = xcb_set_input_focus_checked(connection, XCB_INPUT_FOCUS_POINTER_ROOT, window, XCB_CURRENT_TIME);
-        check_xcb_cookie(focus_cookie, connection, "Failed to grab focus.");
-        break;
-      }
+                                          /* Get the input focus. */
+                                          xcb_void_cookie_t focus_cookie = xcb_set_input_focus_checked(connection, XCB_INPUT_FOCUS_POINTER_ROOT, window, XCB_CURRENT_TIME);
+                                          check_xcb_cookie(focus_cookie, connection, "Failed to grab focus.");
+                                          break;
+                                        }
       default:
-        break;
+                                        break;
     }
 
     free(event);

@@ -58,7 +58,7 @@ void *get_results(void *args) {
       ret = read(fd, global.result_buf + res, sizeof(global.result_buf) - res);
       res += ret;
     } while(!find_newline(global.result_buf, sizeof(global.result_buf))
-            && ret > 0);
+        && ret > 0);
 
     if (res < 0) {
       fprintf(stderr, "Error in spawned cmd.\n");
@@ -76,7 +76,7 @@ void *get_results(void *args) {
     global.result_count = result_count;
     debug("Recieved %d results.\n", result_count);
     if (global.result_count) {
-        draw_result_text(connection, window, cairo_context, cairo_surface, results);
+      draw_result_text(connection, window, cairo_context, cairo_surface, results);
     } else {
       /* If no result found, just draw an empty window. */
       uint32_t values[] = { settings.width, settings.height };
