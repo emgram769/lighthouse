@@ -6,6 +6,7 @@ CFLAGS+=-I$(INCDIR)
 
 SRCS=$(wildcard $(SRCDIR)/*.c)
 OBJS=$(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
+TARGET=lighthouse
 
 CFLAGS+=-O2 -Wall -std=c99
 CFLAGS_DEBUG+=-O0 -g3 -Werror -DDEBUG -pedantic
@@ -35,18 +36,18 @@ else
 endif
 
 
-all: lighthouse
+all: $(TARGET)
 
 debug: CC+=$(CFLAGS_DEBUG)
-debug: lighthouse .FORCE
+debug: $(TARGET) .FORCE
 
-config: lighthouse .FORCE
-	cp -ir ./config/* ~/.config/
-	chmod +x ~/.config/lighthouse/cmd*
+config: $(TARGET) .FORCE
+	mkdir -p ~/.config/$(TARGET)
+	if [ ! -s ~/.config/$(TARGET)/lighthouserc ]; then cp -ir ./config/* ~/.config/ && chmod +x ~/.config/$(TARGET)/cmd*; fi;
 
 .FORCE:
 
-lighthouse: $(OBJS)
+$(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 $(OBJS): | $(OBJDIR)
@@ -56,6 +57,9 @@ $(OBJDIR):
 $(OBJDIR)/%.o: $(SRCDIR)/%.c $(wildcard $(INCDIR)/*.h) Makefile
 	$(CC) $(CFLAGS) $< -c -o $@
 
+install: $(TARGET)
+	cp $(TARGET) /usr/local/bin/$(TARGET)
+
 clean:
-	rm -rf $(OBJDIR) lighthouse
+	rm -rf $(OBJDIR) $(TARGET)
 

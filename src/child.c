@@ -134,7 +134,7 @@ int32_t spawn_piped_process(char *file, int32_t *to_child_fd, int32_t *from_chil
 
   /* Execute the user process. */
   if ((child_pid = fork()) == -1) {
-    fprintf(stderr, "Couldn't spawn cmd: %s\n", strerror(errno));
+    fprintf(stderr, "Couldn't spawn command: %s\n", strerror(errno));
     return -1;
   }
 
@@ -152,7 +152,7 @@ int32_t spawn_piped_process(char *file, int32_t *to_child_fd, int32_t *from_chil
 
     argv[0] = file;
     execvp(file, (char * const *)argv);
-    fprintf(stderr, "Couldn't execute file: %s\n", strerror(errno));
+    fprintf(stderr, "Couldn't execute file '%s': %s\n", file, strerror(errno));
     close(out_pipe[1]);
     close(in_pipe[0]);
     return -1;

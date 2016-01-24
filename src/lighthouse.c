@@ -147,7 +147,7 @@ static void get_next_line(uint32_t *highlight) {
       global.result_highlight = *highlight;
 }
 
-   /* @brief Set the highlight below the next title present in global.results
+/* @brief Set the highlight below the next title present in global.results
  *
  * @param Copy of the global.result_highlight for the ease of use.
  */
@@ -866,12 +866,12 @@ int main(int argc, char **argv) {
 
   /* Spawn a thread to listen to our remote process. */
   if (pthread_mutex_init(&global.draw_mutex, NULL)) {
-    fprintf(stderr, "Failed to create mutex.");
+    fprintf(stderr, "Failed to create mutex.\n");
     goto cleanup;
   }
 
   if (pthread_mutex_init(&global.result_mutex, NULL)) {
-    fprintf(stderr, "Failed to create mutex.");
+    fprintf(stderr, "Failed to create mutex.\n");
     goto cleanup;
   }
 
@@ -887,19 +887,13 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  xcb_map_window(connection, window);
-
   /* Query string. */
   char query_string[MAX_QUERY];
   memset(query_string, 0, sizeof(query_string));
   uint32_t query_index = 0;
   uint32_t query_cursor_index = 0;
 
-  /* Now draw everything. */
-  cairo_set_line_width(cairo_context, 2);
-  redraw_all(connection, window, cairo_context, cairo_surface, query_string, query_cursor_index);
-
-  /* and center it */
+  /* Center the window */
   /* Assign value for the window position with and without description window */
   global.win_x_pos_with_desc = settings.screen_x + settings.x * settings.screen_width / 100
       - (settings.width + settings.desc_size) / 2;
@@ -914,6 +908,11 @@ int main(int argc, char **argv) {
     values[1] = global.win_y_pos;
   }
   xcb_configure_window(connection, window, XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
+
+  /* Now draw everything. */
+  xcb_map_window(connection, window);
+  cairo_set_line_width(cairo_context, 2);
+  redraw_all(connection, window, cairo_context, cairo_surface, query_string, query_cursor_index);
 
   xcb_generic_event_t *event;
   while ((event = xcb_wait_for_event(connection))) {
