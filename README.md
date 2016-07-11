@@ -6,7 +6,7 @@ A simple flexible popup dialog to run on X.
 </p>
 
 
-In the demo a hotkey is mapped to `lighthouse | sh` with `lighthouserc` using `cmd.py`, which is included in `config/lighthouse/` and installed by `make config`.
+In the demo a hotkey is mapped to `lighthouse | sh` with `lighthouserc` using `cmd.py`, which is included in `config/lighthouse/` and installed by `lighthouse-install`.
 # Installation
 
 Available in the AUR as [lighthouse-git](https://aur.archlinux.org/packages/lighthouse-git/).
@@ -18,13 +18,13 @@ Build the binary.
 
     make
 
-Copy it to some location in your $PATH.
+Install the binary.
 
-    sudo cp lighthouse /usr/bin/lighthouse
+    sudo make install
 
 Create config files. (This is important!)
 
-    make config
+    lighthouse-install
     
 You may also need to make all the `cmd` scripts executable.  (If you write your own script, be sure to make that exectuable as well.)
 
@@ -90,7 +90,7 @@ The syntax of a result is simple.
 `{ title | action }`or `{ title | action | description }`
 The `title` is displayed in the results and the `action` is written to standard out
 when that result is selected.  A common use case would therefore be
-`lighthouse | sh` and `action` would be some shell command.  Run `make config` and then
+`lighthouse | sh` and `action` would be some shell command.  Run `lighthouse-install` and then
 `lighthouse | sh` to see this in action.  The `title` will be `look! [input]` and the
 `action` will be `[input]`, so you've effectively created a small one time shell prompt.
 The description is a text displayed according to the highlighted selection.
@@ -136,7 +136,7 @@ For example `lighthouse -c ~/lighthouserc2 -- some arguments for cmd handler`
 Configuration file
 ---
 Check out the sample `lighthouserc` in `config/lighthouse`.  Copy it to your directory by
-running `make config`.
+running `lighthouse-install`.
 
 List of settings you can set in the configuration file:
 - `font_name`
