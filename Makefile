@@ -57,7 +57,7 @@ install: all .FORCE
 	@cp -r config/lighthouse ${DESTDIR}${SHAREPREFIX}/.config
 	@chmod +x ${DESTDIR}${SHAREPREFIX}/.config/lighthouse/cmd*
 	@echo installing lighthouse-install script
-	@echo "#!\$(DOLLAR)/bin/sh" > ${DESTDIR}${PREFIX}/bin/lighthouse-install
+	@echo "#!/bin/sh" > ${DESTDIR}${PREFIX}/bin/lighthouse-install
 	@echo "cp -r -n ${DESTDIR}${SHAREPREFIX}/.config/lighthouse \$(DOLLAR)HOME/.config" >> ${DESTDIR}${PREFIX}/bin/lighthouse-install
 	@echo "chmod -R +w \$(DOLLAR)HOME/.config/lighthouse" >> ${DESTDIR}${PREFIX}/bin/lighthouse-install
 	@chmod +x ${DESTDIR}${PREFIX}/bin/lighthouse-install
