@@ -4,7 +4,6 @@ import sys
 import random
 from time import sleep
 import logging
-from google import pygoogle
 from multiprocessing import Process, Value, Manager, Array
 from ctypes import c_char, c_char_p
 import subprocess
@@ -49,16 +48,6 @@ def update_output():
   results = json.loads(resultStr.value)
   print "".join(results)
   sys.stdout.flush()
-  
-google_thr = None
-def google(query):
-  sleep(.5) # so we aren't querying EVERYTHING we type
-  g = pygoogle(userInput, log_level=logging.CRITICAL)
-  g.pages = 1
-  out = g.get_urls()
-  if (len(out) >= 1):  
-    append_output(out[0], "xdg-open " + out[0])
-    update_output()
   
 find_thr = None
 def find(query):
@@ -155,8 +144,6 @@ while 1:
     clear_output()
 
     # Kill previous worker threads
-    if google_thr is not None:
-        google_thr.terminate()
     if find_thr is not None:
         find_thr.terminate()
 
@@ -208,8 +195,6 @@ while 1:
             pass
 
         # Spawn worker threads
-        google_thr = Process(target=google, args=(userInput,))
-        google_thr.start()
         find_thr = Process(target=find, args=(userInput,))
         find_thr.start()
 
