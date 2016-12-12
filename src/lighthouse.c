@@ -412,7 +412,6 @@ static void set_color_setting(char* val, color_t* color) {
  * @return Void.
  */
 static void set_setting(char *param, char *val) {
-  fprintf(stderr, "%s = %s\n", param, val);
   if (!strcmp("font_name", param)) {
     settings.font_name = val;
   } else if (!strcmp("font_size", param)) {
@@ -707,13 +706,11 @@ int main(int argc, char **argv) {
   int32_t to_child_fd, from_child_fd;
 
   char *exec_file;
-  if( access( settings.cmd, F_OK ) == -1 ) {
+  if(access( settings.cmd, F_OK ) == -1) {
     exec_file = "/usr/share/lighthouse/cmd.py";
   } else {
     exec_file = settings.cmd;
   }
-
-  fprintf(stderr, exec_file);
 
   if (spawn_piped_process(exec_file, &to_child_fd, &from_child_fd, (char **)cmdargs)) {
     fprintf(stderr, "Failed to spawn piped process.\n");
