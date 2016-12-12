@@ -705,7 +705,12 @@ int main(int argc, char **argv) {
   /* Set up the remote process. */
   int32_t to_child_fd, from_child_fd;
 
-  char *exec_file = settings.cmd;
+  char *exec_file;
+  if(access(settings.cmd, F_OK) == -1) {
+    exec_file = "/usr/share/lighthouse/cmd.py";
+  } else {
+    exec_file = settings.cmd;
+  }
 
   if (spawn_piped_process(exec_file, &to_child_fd, &from_child_fd, (char **)cmdargs)) {
     fprintf(stderr, "Failed to spawn piped process.\n");
