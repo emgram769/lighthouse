@@ -5,6 +5,7 @@ PREFIX = /usr/local
 SHAREPREFIX = ${PREFIX}/share/lighthouse
 DOLLAR = $$
 
+CC?=gcc
 CFLAGS+=-I$(INCDIR)
 
 OBJDIR=objs
