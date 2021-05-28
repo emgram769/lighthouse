@@ -112,8 +112,8 @@ support.
 Other ways to use lighthouse
 ---
 Because everything is handled through standard in and out, you can use pretty much any
-executable.  If you want to use a python file `~/.config/lighthouse/cmd.py`, simply point to it in `~/.config/lighthouse/lighthouserc`
-by making the line `cmd=~/.config/lighthouse/cmd.py`.  (Be sure to include `#!/usr/bin/python` at the top of your script!)  If you'd like some inspiration, check out the script in `config/lighthouse/cmd.py`.
+executable. If you want to use a python file `~/.config/lighthouse/cmd.py`, simply point to it in `~/.config/lighthouse/lighthouserc`
+by making the line `cmd=~/.config/lighthouse/cmd.py`.  (Be sure to include `#!/usr/bin/python` at the top of your script!)  If you'd like some inspiration, check out the script in `config/lighthouse/cmd.py`. If you want to use a simple java approach with a history feature, point the `jcmd` file in `~/.config/lighthouse/lighthouserc` `cmd` key, is a bash wrapper to execute the `cmd.jar` file, also check your java version and validate if you are using a 11 or greater version.
 
 Debugging your script
 ---
