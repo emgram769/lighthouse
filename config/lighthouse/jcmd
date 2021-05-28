@@ -1,1 +1,3 @@
-/home/kaneda/.config/lighthouse/jcmd
+#!/usr/bin/env bash
+
+java -jar ~/.config/lighthouse/cmd.jar $(echo $HOME"/.config/lighthouse/history")
